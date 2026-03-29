@@ -325,7 +325,7 @@ for i, ticker in enumerate(tickers):
 # ================================
 
 """
-## ⚡ Pre-open Market Movers 
+## ⚡ Pre-open Market Movers
 
 
 """
