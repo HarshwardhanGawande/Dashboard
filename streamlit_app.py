@@ -42,281 +42,289 @@ st.set_page_config(
 )
 
 """
-# :material/query_stats: Stock peer analysis
+## ⚡ Stock peer analysis
 
-Easily compare stocks against others in their peer group.
 """
+with st.expander("", expanded=True):
+    """
+    # :material/query_stats: Stock peer analysis
 
-""  # Add some space.
+    Easily compare stocks against others in their peer group.
+    """
 
-cols = st.columns([1, 3])
-# Will declare right cell later to avoid showing it when no data.
+    ""  # Add some space.
 
-STOCKS = [
-    "M&M",
-    "ETERNAL",
-    "EICHERMOT",
-    "SHRIRAMFIN",
-    "INDIGO",
-    "ADANIENT",
-    "BAJFINANCE",
-    "TMPV",
-    "LT",
-    "TRENT",
-    "BAJAJ-AUTO",
-    "HINDALCO",
-    "TITAN",
-    "SBIN",
-    "TATASTEEL",
-    "ADANIPORTS",
-    "JIOFIN",
-    "BAJAJFINSV",
-    "SUNPHARMA",
-    "DRREDDY",
-    "MARUTI",
-    "BHARTIARTL",
-    "APOLLOHOSP",
-    "ICICIBANK",
-    "HINDUNILVR",
-    "AXISBANK",
-    "RELIANCE",
-    "KOTAKBANK",
-    "JSWSTEEL",
-    "SBILIFE",
-    "ITC",
-    "GRASIM",
-    "MAXHEALTH",
-    "BEL",
-    "HDFCBANK",
-    "ASIANPAINT",
-    "ULTRACEMCO",
-    "COALINDIA",
-    "POWERGRID",
-    "CIPLA",
-    "HDFCLIFE",
-    "WIPRO",
-    "NTPC",
-    "TCS",
-    "TATACONSUM",
-    "NESTLEIND",
-    "ONGC",
-    "INFY",
-    "TECHM",
-    "HCLTECH"
-]
+    cols = st.columns([1, 3])
+    # Will declare right cell later to avoid showing it when no data.
 
-DEFAULT_STOCKS = ["HDFCBANK", "TECHM", "NESTLEIND", "ULTRACEMCO", "HINDUNILVR", "RELIANCE", "ONGC"]
+    STOCKS = [
+        "M&M",
+        "ETERNAL",
+        "EICHERMOT",
+        "SHRIRAMFIN",
+        "INDIGO",
+        "ADANIENT",
+        "BAJFINANCE",
+        "TMPV",
+        "LT",
+        "TRENT",
+        "BAJAJ-AUTO",
+        "HINDALCO",
+        "TITAN",
+        "SBIN",
+        "TATASTEEL",
+        "ADANIPORTS",
+        "JIOFIN",
+        "BAJAJFINSV",
+        "SUNPHARMA",
+        "DRREDDY",
+        "MARUTI",
+        "BHARTIARTL",
+        "APOLLOHOSP",
+        "ICICIBANK",
+        "HINDUNILVR",
+        "AXISBANK",
+        "RELIANCE",
+        "KOTAKBANK",
+        "JSWSTEEL",
+        "SBILIFE",
+        "ITC",
+        "GRASIM",
+        "MAXHEALTH",
+        "BEL",
+        "HDFCBANK",
+        "ASIANPAINT",
+        "ULTRACEMCO",
+        "COALINDIA",
+        "POWERGRID",
+        "CIPLA",
+        "HDFCLIFE",
+        "WIPRO",
+        "NTPC",
+        "TCS",
+        "TATACONSUM",
+        "NESTLEIND",
+        "ONGC",
+        "INFY",
+        "TECHM",
+        "HCLTECH"
+    ]
 
-def stocks_to_str(stocks):
-    return ",".join(stocks)
+    DEFAULT_STOCKS = ["HDFCBANK", "TECHM", "NESTLEIND", "ULTRACEMCO", "HINDUNILVR", "RELIANCE", "ONGC"]
 
-if "tickers_input" not in st.session_state:
-    st.session_state.tickers_input = st.query_params.get(
-        "stocks", stocks_to_str(DEFAULT_STOCKS)
-    ).split(",")
+    def stocks_to_str(stocks):
+        return ",".join(stocks)
 
-# Callback to update query param when input changes
-def update_query_param():
-    if st.session_state.tickers_input:
-        st.query_params["stocks"] = stocks_to_str(st.session_state.tickers_input)
+    if "tickers_input" not in st.session_state:
+        st.session_state.tickers_input = st.query_params.get(
+            "stocks", stocks_to_str(DEFAULT_STOCKS)
+        ).split(",")
+
+    # Callback to update query param when input changes
+    def update_query_param():
+        if st.session_state.tickers_input:
+            st.query_params["stocks"] = stocks_to_str(st.session_state.tickers_input)
+        else:
+            st.query_params.pop("stocks", None)
+
+    top_left_cell = cols[0].container(
+        border=True, height="stretch"  # Removed vertical_alignment="center" as it's not valid for st.container()
+    )
+
+    with top_left_cell:
+        # Selectbox for stock tickers
+        tickers = st.multiselect(
+            "Stock tickers",
+            options=sorted(set(STOCKS) | set(st.session_state.tickers_input)),
+            default=st.session_state.tickers_input,
+            placeholder="Choose stocks to compare. Example: NVDA",
+            # Removed accept_new_options=True as it's not valid for st.multiselect()
+        )
+
+    # Time horizon selector
+    horizon_map = {
+        "1 Day": one_day,
+        "1 Week": one_week,
+        "1 Months": one_month,
+        "3 Months": three_months,
+        "6 Months": six_months,
+        "1 Year": one_year,
+        "3 Years": three_years,
+        "5 Years": five_years,
+        "10 Years": ten_years,
+        "20 Years": twenty_years
+    }
+
+    with top_left_cell:
+        # Buttons for picking time horizon
+        horizon = st.pills(
+            "Time horizon",
+            options=list(horizon_map.keys()),
+            default="1 Months",
+        )
+
+    # Interval selector (single select)
+    interval_options = ["15minute", "30minute", "60minute", "day", "week"]
+    with top_left_cell:
+        interval = st.pills(
+            "Interval",
+            options=interval_options,
+            default="day",
+        )
+
+    tickers = [t.upper() for t in tickers]
+
+    # Update query param when text input changes
+    if tickers:
+        st.query_params["stocks"] = stocks_to_str(tickers)
     else:
+        # Clear the param if input is empty
         st.query_params.pop("stocks", None)
 
-top_left_cell = cols[0].container(
-    border=True, height="stretch"  # Removed vertical_alignment="center" as it's not valid for st.container()
-)
+    if not tickers:
+        top_left_cell.info("Pick some stocks to compare", icon=":material/info:")
+        st.stop()
 
-with top_left_cell:
-    # Selectbox for stock tickers
-    tickers = st.multiselect(
-        "Stock tickers",
-        options=sorted(set(STOCKS) | set(st.session_state.tickers_input)),
-        default=st.session_state.tickers_input,
-        placeholder="Choose stocks to compare. Example: NVDA",
-        # Removed accept_new_options=True as it's not valid for st.multiselect()
+    right_cell = cols[1].container(
+        border=True, height="stretch"  # Removed vertical_alignment="center" as it's not valid
     )
 
-# Time horizon selector
-horizon_map = {
-    "1 Day": one_day,
-    "1 Week": one_week,
-    "1 Months": one_month,
-    "3 Months": three_months,
-    "6 Months": six_months,
-    "1 Year": one_year,
-    "3 Years": three_years,
-    "5 Years": five_years,
-    "10 Years": ten_years,
-    "20 Years": twenty_years
-}
+    # load_data function is imported from zerodha_data module
 
-with top_left_cell:
-    # Buttons for picking time horizon
-    horizon = st.pills(
-        "Time horizon",
-        options=list(horizon_map.keys()),
-        default="1 Months",
+    # Load the data
+    try:
+        tickers_with_nifty = tickers + ["NIFTY 50"]
+        data = load_data(tickers_with_nifty, from_date=horizon_map[horizon], interval=interval)
+    except Exception as e:
+        st.error(f"Error loading data: {str(e)}")
+        st.stop()
+
+    empty_columns = data.columns[data.isna().all()].tolist()
+
+    if empty_columns:
+        st.error(f"Error loading data for the tickers: {', '.join(empty_columns)}.")
+        st.stop()
+
+    # Normalize prices (start at 1)
+    normalized = data.div(data.iloc[0])
+
+    latest_norm_values = {normalized[ticker].iat[-1]: ticker for ticker in tickers}
+    max_norm_value = max(latest_norm_values.items())
+    min_norm_value = min(latest_norm_values.items())
+
+    bottom_left_cell = cols[0].container(
+        border=True, height="stretch"  # Removed vertical_alignment="center"
     )
 
-# Interval selector (single select)
-interval_options = ["15minute", "30minute", "60minute", "day", "week"]
-with top_left_cell:
-    interval = st.pills(
-        "Interval",
-        options=interval_options,
-        default="day",
-    )
+    with bottom_left_cell:
+        cols = st.columns(2)
+        cols[0].metric(
+            "Best stock",
+            max_norm_value[1],
+            delta=f"{round(max_norm_value[0] * 100)}%",
+            width="content",
+        )
+        cols[1].metric(
+            "Worst stock",
+            min_norm_value[1],
+            delta=f"{round(min_norm_value[0] * 100)}%",
+            width="content",
+        )
 
-tickers = [t.upper() for t in tickers]
-
-# Update query param when text input changes
-if tickers:
-    st.query_params["stocks"] = stocks_to_str(tickers)
-else:
-    # Clear the param if input is empty
-    st.query_params.pop("stocks", None)
-
-if not tickers:
-    top_left_cell.info("Pick some stocks to compare", icon=":material/info:")
-    st.stop()
-
-right_cell = cols[1].container(
-    border=True, height="stretch"  # Removed vertical_alignment="center" as it's not valid
-)
-
-# load_data function is imported from zerodha_data module
-
-# Load the data
-try:
-    tickers_with_nifty = tickers + ["NIFTY 50"]
-    data = load_data(tickers_with_nifty, from_date=horizon_map[horizon], interval=interval)
-except Exception as e:
-    st.error(f"Error loading data: {str(e)}")
-    st.stop()
-
-empty_columns = data.columns[data.isna().all()].tolist()
-
-if empty_columns:
-    st.error(f"Error loading data for the tickers: {', '.join(empty_columns)}.")
-    st.stop()
-
-# Normalize prices (start at 1)
-normalized = data.div(data.iloc[0])
-
-latest_norm_values = {normalized[ticker].iat[-1]: ticker for ticker in tickers}
-max_norm_value = max(latest_norm_values.items())
-min_norm_value = min(latest_norm_values.items())
-
-bottom_left_cell = cols[0].container(
-    border=True, height="stretch"  # Removed vertical_alignment="center"
-)
-
-with bottom_left_cell:
-    cols = st.columns(2)
-    cols[0].metric(
-        "Best stock",
-        max_norm_value[1],
-        delta=f"{round(max_norm_value[0] * 100)}%",
-        width="content",
-    )
-    cols[1].metric(
-        "Worst stock",
-        min_norm_value[1],
-        delta=f"{round(min_norm_value[0] * 100)}%",
-        width="content",
-    )
-
-# Plot normalized prices
-with right_cell:
-    st.altair_chart(
-        alt.Chart(
-            normalized.reset_index().melt(
-                id_vars=["Date"], var_name="Stock", value_name="Normalized price"
+    # Plot normalized prices
+    with right_cell:
+        st.altair_chart(
+            alt.Chart(
+                normalized.reset_index().melt(
+                    id_vars=["Date"], var_name="Stock", value_name="Normalized price"
+                )
             )
+            .mark_line()
+            .encode(
+                alt.X("Date:T"),
+                alt.Y("Normalized price:Q").scale(zero=False),
+                alt.Color("Stock:N"),
+            )
+            .properties(height=400)
         )
-        .mark_line()
-        .encode(
-            alt.X("Date:T"),
-            alt.Y("Normalized price:Q").scale(zero=False),
-            alt.Color("Stock:N"),
-        )
-        .properties(height=400)
-    )
 
-""
-""
-
-# Plot individual stock vs peer average
+    ""
+    ""
 """
-## Individual stocks vs Nifty50
+## ⚡ Individual stocks vs Nifty50
 
-For the analysis below, each stock is compared against the Nifty50 index.
 """
+with st.expander("", expanded=True):
+    # Plot individual stock vs peer average
+    """
 
-if len(tickers) <= 1:
-    st.warning("Pick 2 or more tickers to compare them")
-    st.stop()
+    For the analysis below, each stock is compared against the Nifty50 index.
+    """
 
-NUM_COLS = 4
-cols = st.columns(NUM_COLS)
+    if len(tickers) <= 1:
+        st.warning("Pick 2 or more tickers to compare them")
+        st.stop()
 
-for i, ticker in enumerate(tickers):
-    # Use Nifty50 instead of peer average
-    nifty_data = normalized["NIFTY 50"]
+    NUM_COLS = 4
+    cols = st.columns(NUM_COLS)
 
-    # Create DataFrame with Nifty50.
-    plot_data = pd.DataFrame(
-        {
-            "Date": normalized.index,
-            ticker: normalized[ticker],
-            "Nifty50": nifty_data,
-        }
-    ).melt(id_vars=["Date"], var_name="Series", value_name="Price")
+    for i, ticker in enumerate(tickers):
+        # Use Nifty50 instead of peer average
+        nifty_data = normalized["NIFTY 50"]
 
-    chart = (
-        alt.Chart(plot_data)
-        .mark_line()
-        .encode(
-            alt.X("Date:T"),
-            alt.Y("Price:Q").scale(zero=False),
-            alt.Color(
-                "Series:N",
-                scale=alt.Scale(domain=[ticker, "Nifty50"], range=["red", "blue"]),
-                legend=alt.Legend(orient="bottom"),
-            ),
-            alt.Tooltip(["Date", "Series", "Price"]),
+        # Create DataFrame with Nifty50.
+        plot_data = pd.DataFrame(
+            {
+                "Date": normalized.index,
+                ticker: normalized[ticker],
+                "Nifty50": nifty_data,
+            }
+        ).melt(id_vars=["Date"], var_name="Series", value_name="Price")
+
+        chart = (
+            alt.Chart(plot_data)
+            .mark_line()
+            .encode(
+                alt.X("Date:T"),
+                alt.Y("Price:Q").scale(zero=False),
+                alt.Color(
+                    "Series:N",
+                    scale=alt.Scale(domain=[ticker, "Nifty50"], range=["red", "blue"]),
+                    legend=alt.Legend(orient="bottom"),
+                ),
+                alt.Tooltip(["Date", "Series", "Price"]),
+            )
+            .properties(title=f"{ticker} vs Nifty50", height=300)
         )
-        .properties(title=f"{ticker} vs Nifty50", height=300)
-    )
 
-    cell = cols[(i * 2) % NUM_COLS].container(border=True)
-    cell.write("")
-    cell.altair_chart(chart, use_container_width=True)
+        cell = cols[(i * 2) % NUM_COLS].container(border=True)
+        cell.write("")
+        cell.altair_chart(chart, use_container_width=True)
 
-    # Create Delta chart
-    plot_data = pd.DataFrame(
-        {
-            "Date": normalized.index,
-            "Delta": normalized[ticker] - nifty_data,
-        }
-    )
-
-    chart = (
-        alt.Chart(plot_data)
-        .mark_area()
-        .encode(
-            alt.X("Date:T"),
-            alt.Y("Delta:Q").scale(zero=False),
+        # Create Delta chart
+        plot_data = pd.DataFrame(
+            {
+                "Date": normalized.index,
+                "Delta": normalized[ticker] - nifty_data,
+            }
         )
-        .properties(title=f"{ticker} minus Nifty50", height=300)
-    )
 
-    cell = cols[(i * 2 + 1) % NUM_COLS].container(border=True)
-    cell.write("")
-    cell.altair_chart(chart, use_container_width=True)
+        chart = (
+            alt.Chart(plot_data)
+            .mark_area()
+            .encode(
+                alt.X("Date:T"),
+                alt.Y("Delta:Q").scale(zero=False),
+            )
+            .properties(title=f"{ticker} minus Nifty50", height=300)
+        )
 
-""
-""
+        cell = cols[(i * 2 + 1) % NUM_COLS].container(border=True)
+        cell.write("")
+        cell.altair_chart(chart, use_container_width=True)
+
+    ""
+    ""
 
 # data
 
@@ -329,306 +337,306 @@ for i, ticker in enumerate(tickers):
 
 
 """
+with st.expander("", expanded=True):
+    try:
+        pre_open = get_pre_open_data()
+        df1 = pre_open[0]
+        advance_count = pre_open[1]
+        decline_count = pre_open[2]
+        per_advance_turnover = pre_open[3]
+        per_decline_turnover = pre_open[4]
+        df = df1[["SYMBOL", "%CHNG", "VALUE"]].copy()
+        df10 = df.head(10)
 
-try:
-    pre_open = get_pre_open_data()
-    df1 = pre_open[0]
-    advance_count = pre_open[1]
-    decline_count = pre_open[2]
-    per_advance_turnover = pre_open[3]
-    per_decline_turnover = pre_open[4]
-    df = df1[["SYMBOL", "%CHNG", "VALUE"]].copy()
-    df10 = df.head(10)
+        # Build bucket ranges for the full pre-open dataset
+        bins = [-20, -10, -5, -3, -1, 0, 1, 3, 5, 10, 20]
+        labels = [
+            "-20% to -10%",
+            "-10% to -5%",
+            "-5% to -3%",
+            "-3% to -1%",
+            "-1% to 0%",
+            "0% to 1%",
+            "1% to 3%",
+            "3% to 5%",
+            "5% to 10%",
+            "10% to 20%",
+        ]
+        df_full = df.copy()  # Use full df for bucketing
+        df_full["range"] = pd.cut(df_full["%CHNG"], bins=bins, labels=labels, include_lowest=True)
 
-    # Build bucket ranges for the full pre-open dataset
-    bins = [-20, -10, -5, -3, -1, 0, 1, 3, 5, 10, 20]
-    labels = [
-        "-20% to -10%",
-        "-10% to -5%",
-        "-5% to -3%",
-        "-3% to -1%",
-        "-1% to 0%",
-        "0% to 1%",
-        "1% to 3%",
-        "3% to 5%",
-        "5% to 10%",
-        "10% to 20%",
-    ]
-    df_full = df.copy()  # Use full df for bucketing
-    df_full["range"] = pd.cut(df_full["%CHNG"], bins=bins, labels=labels, include_lowest=True)
-
-    bucket_counts = (
-        df_full.groupby("range")
-        .agg(count=("range", "size"), total_value=("VALUE", "sum"))
-        .reset_index()
-    )
-
-    # Keep sorted order
-    bucket_counts["range"] = pd.Categorical(bucket_counts["range"], categories=labels, ordered=True)
-    bucket_counts = bucket_counts.sort_values("range")
-    bucket_counts["total_value_label"] = bucket_counts["total_value"].map(lambda x: f"{x:,.0f} cr")
-
-    range_chart = (
-        alt.Chart(bucket_counts)
-        .mark_bar(cornerRadius=8)
-        .encode(
-            y=alt.Y(
-                "range:N",
-                sort=labels,
-                title="% Change bucket",
-                axis=alt.Axis(labelFontSize=13, titleFontSize=15),
-            ),
-            x=alt.X(
-                "count:Q",
-                title="Number of stocks",
-                axis=alt.Axis(labelFontSize=13, titleFontSize=15),
-            ),
-            color=alt.condition(
-                alt.FieldOneOfPredicate(field="range", oneOf=["0% to 1%", "1% to 3%", "3% to 5%", "5% to 10%", "10% to 20%"]),
-                alt.value("#2ca02c"),
-                alt.value("#d62728"),
-            ),
-            tooltip=["range", "count", "total_value_label"],
+        bucket_counts = (
+            df_full.groupby("range")
+            .agg(count=("range", "size"), total_value=("VALUE", "sum"))
+            .reset_index()
         )
-        .properties(
-            title="Pre-open Stock Count by % Change Bucket",
-            height=360,
+
+        # Keep sorted order
+        bucket_counts["range"] = pd.Categorical(bucket_counts["range"], categories=labels, ordered=True)
+        bucket_counts = bucket_counts.sort_values("range")
+        bucket_counts["total_value_label"] = bucket_counts["total_value"].map(lambda x: f"{x:,.0f} cr")
+
+        range_chart = (
+            alt.Chart(bucket_counts)
+            .mark_bar(cornerRadius=8)
+            .encode(
+                y=alt.Y(
+                    "range:N",
+                    sort=labels,
+                    title="% Change bucket",
+                    axis=alt.Axis(labelFontSize=13, titleFontSize=15),
+                ),
+                x=alt.X(
+                    "count:Q",
+                    title="Number of stocks",
+                    axis=alt.Axis(labelFontSize=13, titleFontSize=15),
+                ),
+                color=alt.condition(
+                    alt.FieldOneOfPredicate(field="range", oneOf=["0% to 1%", "1% to 3%", "3% to 5%", "5% to 10%", "10% to 20%"]),
+                    alt.value("#2ca02c"),
+                    alt.value("#d62728"),
+                ),
+                tooltip=["range", "count", "total_value_label"],
+            )
+            .properties(
+                title="Pre-open Stock Count by % Change Bucket",
+                height=360,
+                width="container",
+            )
+        )
+
+        count_text = (
+            alt.Chart(bucket_counts)
+            .mark_text(dx=5, align="left", color="white", fontWeight="bold", fontSize=13)
+            .encode(
+                y=alt.Y("range:N", sort=labels),
+                x=alt.X("count:Q"),
+                text=alt.Text("count:Q", format="d"),
+            )
+        )
+
+        range_chart = range_chart + count_text
+
+        # Create turnover chart for ranges
+        turnover_range_chart = (
+            alt.Chart(bucket_counts)
+            .mark_bar(cornerRadius=8)
+            .encode(
+                y=alt.Y(
+                    "range:N",
+                    sort=labels,
+                    title="% Change bucket",
+                    axis=alt.Axis(labelFontSize=13, titleFontSize=15),
+                ),
+                x=alt.X(
+                    "total_value:Q",
+                    title="Total Turnover (Cr)",
+                    axis=alt.Axis(labelFontSize=13, titleFontSize=15),
+                ),
+                color=alt.condition(
+                    alt.FieldOneOfPredicate(field="range", oneOf=["0% to 1%", "1% to 3%", "3% to 5%", "5% to 10%", "10% to 20%"]),
+                    alt.value("#1f77b4"),
+                    alt.value("#ff7f0e"),
+                ),
+                tooltip=["range", "total_value_label"],
+            )
+            .properties(
+                title="Pre-open Turnover by % Change Bucket",
+                height=360,
+                width="container",
+            )
+        )
+
+        turnover_text = (
+            alt.Chart(bucket_counts)
+            .mark_text(dx=5, align="left", color="white", fontWeight="bold", fontSize=13)
+            .encode(
+                y=alt.Y("range:N", sort=labels),
+                x=alt.X("total_value:Q"),
+                text=alt.Text("total_value_label:N"),
+            )
+        )
+
+        turnover_range_chart = turnover_range_chart + turnover_text
+
+
+        counts_df = pd.DataFrame(
+            {
+                "Status": ["Advance", "Decline"],
+                "Count": [advance_count, decline_count],
+            }
+        )
+
+        # Bar chart with bars
+        bar = (
+            alt.Chart(counts_df)
+            .mark_bar()
+            .encode(
+                x=alt.X("Status:N", title="Market Direction"),
+                y=alt.Y("Count:Q", title=""),
+                color=alt.Color(
+                    "Status:N",
+                    scale=alt.Scale(domain=["Advance", "Decline"], range=["green", "red"]),
+                    legend=None,
+                ),
+                tooltip=["Status", "Count"],
+            )
+        )
+
+        # Text labels on bars
+        text = (
+            alt.Chart(counts_df)
+            .mark_text(
+                dy=-8,  # Position text slightly above the bar top
+                color="white",
+                size=14,
+                fontWeight="bold",
+            )
+            .encode(
+                x=alt.X("Status:N"),
+                y=alt.Y("Count:Q"),
+                text=alt.Text("Count:Q"),  # Display the count number
+            )
+        )
+
+        # Combine bar and text
+        adv_dec_chart = (bar + text).properties(
+            height=320,
             width="container",
+            title="Advance vs Decline",
         )
-    )
+        # Use only the first 10 rows for the bubble chart
+        df = df10.copy()
+        df = df.dropna()
+        df = df[df["VALUE"] > 0]
 
-    count_text = (
-        alt.Chart(bucket_counts)
-        .mark_text(dx=5, align="left", color="white", fontWeight="bold", fontSize=13)
-        .encode(
-            y=alt.Y("range:N", sort=labels),
-            x=alt.X("count:Q"),
-            text=alt.Text("count:Q", format="d"),
+        # Optional: Top movers only within the first 10 rows
+        df = df.sort_values("%CHNG", key=abs, ascending=False).head(10)
+
+        # Color
+        df["Color"] = df["%CHNG"].apply(lambda x: "Gain" if x > 0 else "Loss")
+
+
+
+        # Dynamic Y-axis ticks
+        max_val = max(abs(df["%CHNG"].max()), abs(df["%CHNG"].min()))
+        max_val = round(max_val + 0.5)
+        ticks = np.arange(-max_val, max_val + 0.5, 0.5)
+
+        # Bubble chart without legends
+        bubble_chart = (
+            alt.Chart(df)
+            .mark_circle(opacity=0.7)
+            .encode(
+                x=alt.X("SYMBOL:N", title="Stock"),
+                y=alt.Y(
+                    "%CHNG:Q",
+                    title="% Change",
+                    scale=alt.Scale(domain=[-max_val, max_val]),
+                    axis=alt.Axis(values=ticks)
+                ),
+                size=alt.Size("VALUE:Q", scale=alt.Scale(range=[100, 2000]), legend=None),
+                color=alt.Color(
+                    "Color:N",
+                    scale=alt.Scale(domain=["Gain", "Loss"], range=["green", "red"]),
+                    legend=None
+                ),
+                tooltip=["SYMBOL", "%CHNG", "VALUE"]
+            )
+            .properties(height=400)
+            .interactive()
         )
-    )
 
-    range_chart = range_chart + count_text
+        turnover_df = pd.DataFrame({
+                "Status": ["Advance", "Decline"],
+                "Turnover": [per_advance_turnover, per_decline_turnover],
+            })
 
-    # Create turnover chart for ranges
-    turnover_range_chart = (
-        alt.Chart(bucket_counts)
-        .mark_bar(cornerRadius=8)
-        .encode(
-            y=alt.Y(
-                "range:N",
-                sort=labels,
-                title="% Change bucket",
-                axis=alt.Axis(labelFontSize=13, titleFontSize=15),
-            ),
-            x=alt.X(
-                "total_value:Q",
-                title="Total Turnover (Cr)",
-                axis=alt.Axis(labelFontSize=13, titleFontSize=15),
-            ),
-            color=alt.condition(
-                alt.FieldOneOfPredicate(field="range", oneOf=["0% to 1%", "1% to 3%", "3% to 5%", "5% to 10%", "10% to 20%"]),
-                alt.value("#1f77b4"),
-                alt.value("#ff7f0e"),
-            ),
-            tooltip=["range", "total_value_label"],
+        turnover_bar = (
+            alt.Chart(turnover_df)
+            .mark_bar()
+            .encode(
+                x=alt.X("Status:N", title="Turnover Direction"),
+                y=alt.Y("Turnover:Q", title=""),
+                color=alt.Color(
+                    "Status:N",
+                    scale=alt.Scale(domain=["Advance", "Decline"], range=["green", "red"]),
+                    legend=None,
+                ),
+                tooltip=["Status", "Turnover"],
+            )
+            .properties(
+                height=280,
+                width="container",
+                title="Turnover Adv Vs Dec",
+            )
         )
-        .properties(
-            title="Pre-open Turnover by % Change Bucket",
-            height=360,
-            width="container",
+
+        turnover_text = (
+            alt.Chart(turnover_df)
+            .mark_text(dy=-8, color="white", size=14, fontWeight="bold")
+            .encode(
+                x=alt.X("Status:N"),
+                y=alt.Y("Turnover:Q"),
+                text=alt.Text("Turnover:Q"),
+            )
         )
-    )
 
-    turnover_text = (
-        alt.Chart(bucket_counts)
-        .mark_text(dx=5, align="left", color="white", fontWeight="bold", fontSize=13)
-        .encode(
-            y=alt.Y("range:N", sort=labels),
-            x=alt.X("total_value:Q"),
-            text=alt.Text("total_value_label:N"),
-        )
-    )
+        turnover_chart = (turnover_bar + turnover_text)
 
-    turnover_range_chart = turnover_range_chart + turnover_text
+        # ------------------------------
+        # Layout: 2 columns (70% chart, 30% data)
+        # ------------------------------
+        col1, col2, col3, col4= st.columns( [10, 3,3, 3])
 
+        # with col1:
+        #     st.altair_chart(bubble_chart, width="stretch", use_container_width=True)
 
-    counts_df = pd.DataFrame(
-        {
-            "Status": ["Advance", "Decline"],
-            "Count": [advance_count, decline_count],
-        }
-    )
+        with col1:
+            with st.container(border=True):
+                st.altair_chart(bubble_chart, use_container_width=True)
 
-    # Bar chart with bars
-    bar = (
-        alt.Chart(counts_df)
-        .mark_bar()
-        .encode(
-            x=alt.X("Status:N", title="Market Direction"),
-            y=alt.Y("Count:Q", title=""),
-            color=alt.Color(
-                "Status:N",
-                scale=alt.Scale(domain=["Advance", "Decline"], range=["green", "red"]),
-                legend=None,
-            ),
-            tooltip=["Status", "Count"],
-        )
-    )
-
-    # Text labels on bars
-    text = (
-        alt.Chart(counts_df)
-        .mark_text(
-            dy=-8,  # Position text slightly above the bar top
-            color="white",
-            size=14,
-            fontWeight="bold",
-        )
-        .encode(
-            x=alt.X("Status:N"),
-            y=alt.Y("Count:Q"),
-            text=alt.Text("Count:Q"),  # Display the count number
-        )
-    )
-
-    # Combine bar and text
-    adv_dec_chart = (bar + text).properties(
-        height=320,
-        width="container",
-        title="Advance vs Decline",
-    )
-    # Use only the first 10 rows for the bubble chart
-    df = df10.copy()
-    df = df.dropna()
-    df = df[df["VALUE"] > 0]
-
-    # Optional: Top movers only within the first 10 rows
-    df = df.sort_values("%CHNG", key=abs, ascending=False).head(10)
-
-    # Color
-    df["Color"] = df["%CHNG"].apply(lambda x: "Gain" if x > 0 else "Loss")
+        # with sep1:
+        #     st.markdown(
+        #         "<div style='width:1px; background:#CCC; height:100%; margin:0 auto;'></div>",
+        #         unsafe_allow_html=True,
+        #     )
 
 
 
-    # Dynamic Y-axis ticks
-    max_val = max(abs(df["%CHNG"].max()), abs(df["%CHNG"].min()))
-    max_val = round(max_val + 0.5)
-    ticks = np.arange(-max_val, max_val + 0.5, 0.5)
+        # with sep2:
+        #     st.markdown(
+        #         "<div style='width:1px; background:#CCC; height:100%; margin:0 auto;'></div>",
+        #         unsafe_allow_html=True,
+        #     )
 
-    # Bubble chart without legends
-    bubble_chart = (
-        alt.Chart(df)
-        .mark_circle(opacity=0.7)
-        .encode(
-            x=alt.X("SYMBOL:N", title="Stock"),
-            y=alt.Y(
-                "%CHNG:Q",
-                title="% Change",
-                scale=alt.Scale(domain=[-max_val, max_val]),
-                axis=alt.Axis(values=ticks)
-            ),
-            size=alt.Size("VALUE:Q", scale=alt.Scale(range=[100, 2000]), legend=None),
-            color=alt.Color(
-                "Color:N",
-                scale=alt.Scale(domain=["Gain", "Loss"], range=["green", "red"]),
-                legend=None
-            ),
-            tooltip=["SYMBOL", "%CHNG", "VALUE"]
-        )
-        .properties(height=400)
-        .interactive()
-    )
+        with col2:
+            with st.container(border=True):
+                st.altair_chart(adv_dec_chart, use_container_width=True)
 
-    turnover_df = pd.DataFrame({
-            "Status": ["Advance", "Decline"],
-            "Turnover": [per_advance_turnover, per_decline_turnover],
-        })
+        with col3:
+            with st.container(border=True):
+                st.altair_chart(turnover_chart, use_container_width=True)
+        with col4:
+            df.sort_values("VALUE", ascending=False, inplace=True)
+            st.dataframe(df.reset_index(drop=True).drop(columns=["Color"]))
 
-    turnover_bar = (
-        alt.Chart(turnover_df)
-        .mark_bar()
-        .encode(
-            x=alt.X("Status:N", title="Turnover Direction"),
-            y=alt.Y("Turnover:Q", title=""),
-            color=alt.Color(
-                "Status:N",
-                scale=alt.Scale(domain=["Advance", "Decline"], range=["green", "red"]),
-                legend=None,
-            ),
-            tooltip=["Status", "Turnover"],
-        )
-        .properties(
-            height=280,
-            width="container",
-            title="Turnover Adv Vs Dec",
-        )
-    )
-
-    turnover_text = (
-        alt.Chart(turnover_df)
-        .mark_text(dy=-8, color="white", size=14, fontWeight="bold")
-        .encode(
-            x=alt.X("Status:N"),
-            y=alt.Y("Turnover:Q"),
-            text=alt.Text("Turnover:Q"),
-        )
-    )
-
-    turnover_chart = (turnover_bar + turnover_text)
-
-    # ------------------------------
-    # Layout: 2 columns (70% chart, 30% data)
-    # ------------------------------
-    col1, col2, col3, col4= st.columns( [10, 3,3, 3])
-
-    # with col1:
-    #     st.altair_chart(bubble_chart, width="stretch", use_container_width=True)
-
-    with col1:
-        with st.container(border=True):
-            st.altair_chart(bubble_chart, use_container_width=True)
-
-    # with sep1:
-    #     st.markdown(
-    #         "<div style='width:1px; background:#CCC; height:100%; margin:0 auto;'></div>",
-    #         unsafe_allow_html=True,
-    #     )
+        # Range chart below the pre-open layout
+        range_col1, r_col2 = st.columns([10, 10])
+        with range_col1:
+            with st.container(border=True):
+                st.altair_chart(range_chart, use_container_width=True)
+        with r_col2:
+            with st.container(border=True):
+                st.altair_chart(turnover_range_chart, use_container_width=True)
+    except Exception as e:
+        st.error(f"Error loading pre-open data: {e}")
 
 
+    # ...existing code after pre-open section...
 
-    # with sep2:
-    #     st.markdown(
-    #         "<div style='width:1px; background:#CCC; height:100%; margin:0 auto;'></div>",
-    #         unsafe_allow_html=True,
-    #     )
-
-    with col2:
-        with st.container(border=True):
-            st.altair_chart(adv_dec_chart, use_container_width=True)
-
-    with col3:
-        with st.container(border=True):
-            st.altair_chart(turnover_chart, use_container_width=True)
-    with col4:
-        df.sort_values("VALUE", ascending=False, inplace=True)
-        st.dataframe(df.reset_index(drop=True).drop(columns=["Color"]))
-
-    # Range chart below the pre-open layout
-    range_col1, r_col2 = st.columns([10, 10])
-    with range_col1:
-        with st.container(border=True):
-            st.altair_chart(range_chart, use_container_width=True)
-    with r_col2:
-        with st.container(border=True):
-            st.altair_chart(turnover_range_chart, use_container_width=True)
-except Exception as e:
-    st.error(f"Error loading pre-open data: {e}")
-
-
-# ...existing code after pre-open section...
-
-""
-""
+    ""
+    ""
 
 # ================================
 # Live Market Data Visualization
@@ -641,190 +649,303 @@ except Exception as e:
 
 """
 # Index selector (single select, like stock ticker but for one index)
+with st.expander("", expanded=True):
+    if "selected_index" not in st.session_state:
+        st.session_state.selected_index = "NIFTY 50"  # Default
 
-if "selected_index" not in st.session_state:
-    st.session_state.selected_index = "NIFTY 50"  # Default
-
-index_options = ["NIFTY 50", "NIFTY BANK", "NIFTY IT", "NIFTY AUTO"]  # Add more as needed
-selected_index = st.pills(
-    "Select Index",
-    options=sorted(set(index_options) | {st.session_state.selected_index}),
-    default=st.session_state.selected_index,
-)
-
-if selected_index:
-    st.session_state.selected_index = selected_index[0] if isinstance(selected_index, list) else selected_index
-
-try:
-    from zerodha_data import get_live_nse_data
-    result = get_live_nse_data(selected_index)
-
-    if isinstance(result, tuple) and len(result) == 5:
-        df, df_advance, df_decline, percent_advance_turnover_live, percent_decline_turnover_live = result
-    else:
-        st.error("Unexpected data format from get_live_nse_data")
-        st.stop()
-
-    # Prepare df for charts
-    df = df.copy()
-    df["%CHNG"] = pd.to_numeric(df["%CHNG"], errors="coerce")
-    df["VALUE"] = pd.to_numeric(df["VALUE"], errors="coerce")
-    df = df.dropna()
-    df = df[df["VALUE"] > 0]
-    df = df.sort_values("%CHNG", key=abs, ascending=False).head(20)
-    df["Color"] = df["%CHNG"].apply(lambda x: "Gain" if x > 0 else "Loss")
-
-    # Dynamic Y-axis ticks
-    max_val = max(abs(df["%CHNG"].max()), abs(df["%CHNG"].min()))
-    max_val = round(max_val + 0.5)
-    ticks = np.arange(-max_val, max_val + 0.5, 0.5)
-
-    # Bubble chart
-    bubble_chart = (
-        alt.Chart(df)
-        .mark_circle(opacity=0.7)
-        .encode(
-            x=alt.X("SYMBOL:N", title="Stock"),
-            y=alt.Y(
-                "%CHNG:Q",
-                title="% Change",
-                scale=alt.Scale(domain=[-max_val, max_val]),
-                axis=alt.Axis(values=ticks)
-            ),
-            size=alt.Size("VALUE:Q", scale=alt.Scale(range=[100, 2000]), legend=None),
-            color=alt.Color(
-                "Color:N",
-                scale=alt.Scale(domain=["Gain", "Loss"], range=["green", "red"]),
-                legend=None
-            ),
-            tooltip=["SYMBOL", "%CHNG", "VALUE"]
-        )
-        .properties(height=400)
-        .interactive()
+    index_options = ["SECURITIES IN F&O","NIFTY 50", "NIFTY BANK", "NIFTY IT", "NIFTY AUTO", "NIFTY ENERGY", "NIFTY OIL & GAS"]  # Add more as needed
+    selected_index = st.pills(
+        "Select Index",
+        options=sorted(set(index_options) | {st.session_state.selected_index}),
+        default=st.session_state.selected_index,
     )
 
-    # Advance/Decline counts
-    counts_df = pd.DataFrame(
-        {
-            "Status": ["Advance", "Decline"],
-            "Count": [df_advance, df_decline],
-        }
-    )
+    if selected_index:
+        st.session_state.selected_index = selected_index[0] if isinstance(selected_index, list) else selected_index
 
-    # Bar chart with bars
-    bar = (
-        alt.Chart(counts_df)
-        .mark_bar()
-        .encode(
-            x=alt.X("Status:N", title="Market Direction"),
-            y=alt.Y("Count:Q", title="Number of Stocks"),
-            color=alt.Color(
-                "Status:N",
-                scale=alt.Scale(domain=["Advance", "Decline"], range=["green", "red"]),
-                legend=None,
-            ),
-            tooltip=["Status", "Count"],
+    try:
+        from zerodha_data import get_live_nse_data
+        result = get_live_nse_data(selected_index)
+
+        if isinstance(result, tuple) and len(result) == 5:
+            df, df_advance, df_decline, percent_advance_turnover_live, percent_decline_turnover_live = result
+        else:
+            st.error("Unexpected data format from get_live_nse_data")
+            st.stop()
+
+        # Prepare df for charts
+        df = df.copy()
+        df["%CHNG"] = pd.to_numeric(df["%CHNG"], errors="coerce")
+        df["VALUE"] = pd.to_numeric(df["VALUE"], errors="coerce")
+        df = df.dropna()
+        df = df[df["VALUE"] > 0]
+        df = df.sort_values("%CHNG", key=abs, ascending=False).head(20)
+        df["Color"] = df["%CHNG"].apply(lambda x: "Gain" if x > 0 else "Loss")
+
+        # Dynamic Y-axis ticks
+        max_val = max(abs(df["%CHNG"].max()), abs(df["%CHNG"].min()))
+        max_val = round(max_val + 0.5)
+        ticks = np.arange(-max_val, max_val + 0.5, 0.5)
+
+        # Bubble chart
+        bubble_chart = (
+            alt.Chart(df)
+            .mark_circle(opacity=0.7)
+            .encode(
+                x=alt.X("SYMBOL:N", title="Stock"),
+                y=alt.Y(
+                    "%CHNG:Q",
+                    title="% Change",
+                    scale=alt.Scale(domain=[-max_val, max_val]),
+                    axis=alt.Axis(values=ticks)
+                ),
+                size=alt.Size("VALUE:Q", scale=alt.Scale(range=[100, 2000]), legend=None),
+                color=alt.Color(
+                    "Color:N",
+                    scale=alt.Scale(domain=["Gain", "Loss"], range=["green", "red"]),
+                    legend=None
+                ),
+                tooltip=["SYMBOL", "%CHNG", "VALUE"]
+            )
+            .properties(height=400)
+            .interactive()
         )
-    )
 
-    # Text labels on bars
-    text = (
-        alt.Chart(counts_df)
-        .mark_text(
-            dy=-8,
-            color="white",
-            size=14,
-            fontWeight="bold",
+        # Advance/Decline counts
+        counts_df = pd.DataFrame(
+            {
+                "Status": ["Advance", "Decline"],
+                "Count": [df_advance, df_decline],
+            }
         )
-        .encode(
-            x=alt.X("Status:N"),
-            y=alt.Y("Count:Q"),
-            text=alt.Text("Count:Q"),
+
+        # Bar chart with bars
+        bar = (
+            alt.Chart(counts_df)
+            .mark_bar()
+            .encode(
+                x=alt.X("Status:N", title="Market Direction"),
+                y=alt.Y("Count:Q", title="Number of Stocks"),
+                color=alt.Color(
+                    "Status:N",
+                    scale=alt.Scale(domain=["Advance", "Decline"], range=["green", "red"]),
+                    legend=None,
+                ),
+                tooltip=["Status", "Count"],
+            )
         )
-    )
 
-    # Combine bar and text
-    adv_dec_chart = (bar + text).properties(
-        height=320,
-        width="container",
-        title="Advance vs Decline",
-    )
-
-    # # Display percent_advance_turnover as a metric
-    # st.metric("Advance Turnover %", f"{percent_advance_turnover:.2f}%")
-
-    turnover_df = pd.DataFrame({
-            "Status": ["Advance", "Decline"],
-            "Turnover": [percent_advance_turnover_live, percent_decline_turnover_live],
-        })
-
-    turnover_bar = (
-        alt.Chart(turnover_df)
-        .mark_bar()
-        .encode(
-            x=alt.X("Status:N", title="Turnover Direction"),
-            y=alt.Y("Turnover:Q", title=""),
-            color=alt.Color(
-                "Status:N",
-                scale=alt.Scale(domain=["Advance", "Decline"], range=["green", "red"]),
-                legend=None,
-            ),
-            tooltip=["Status", "Turnover"],
+        # Text labels on bars
+        text = (
+            alt.Chart(counts_df)
+            .mark_text(
+                dy=-8,
+                color="white",
+                size=14,
+                fontWeight="bold",
+            )
+            .encode(
+                x=alt.X("Status:N"),
+                y=alt.Y("Count:Q"),
+                text=alt.Text("Count:Q"),
+            )
         )
-        .properties(
-            height=280,
+
+        # Combine bar and text
+        adv_dec_chart = (bar + text).properties(
+            height=320,
             width="container",
-            title="Turnover Adv Vs Dec",
+            title="Advance vs Decline",
         )
-    )
 
-    turnover_text = (
-        alt.Chart(turnover_df)
-        .mark_text(dy=-8, color="white", size=14, fontWeight="bold")
-        .encode(
-            x=alt.X("Status:N"),
-            y=alt.Y("Turnover:Q"),
-            text=alt.Text("Turnover:Q"),
+        # # Display percent_advance_turnover as a metric
+        # st.metric("Advance Turnover %", f"{percent_advance_turnover:.2f}%")
+
+        turnover_df = pd.DataFrame({
+                "Status": ["Advance", "Decline"],
+                "Turnover": [percent_advance_turnover_live, percent_decline_turnover_live],
+            })
+
+        turnover_bar = (
+            alt.Chart(turnover_df)
+            .mark_bar()
+            .encode(
+                x=alt.X("Status:N", title="Turnover Direction"),
+                y=alt.Y("Turnover:Q", title=""),
+                color=alt.Color(
+                    "Status:N",
+                    scale=alt.Scale(domain=["Advance", "Decline"], range=["green", "red"]),
+                    legend=None,
+                ),
+                tooltip=["Status", "Turnover"],
+            )
+            .properties(
+                height=280,
+                width="container",
+                title="Turnover Adv Vs Dec",
+            )
         )
-    )
 
-    turnover_chart_live = (turnover_bar + turnover_text)
+        turnover_text = (
+            alt.Chart(turnover_df)
+            .mark_text(dy=-8, color="white", size=14, fontWeight="bold")
+            .encode(
+                x=alt.X("Status:N"),
+                y=alt.Y("Turnover:Q"),
+                text=alt.Text("Turnover:Q"),
+            )
+        )
 
-
-    # Layout: 5 columns (chart | sep | table | sep | adv/decline)
-    col1,col2, col3, col4 = st.columns( [10, 3,3, 3])
-
-    with col1:
-         with st.container(border=True):
-            st.altair_chart(bubble_chart, use_container_width=True)
-
-    # with sep1:
-    #     st.markdown(
-    #         "<div style='width:1px; background:#CCC; height:100%; margin:0 auto;'></div>",
-    #         unsafe_allow_html=True,
-    #     )
+        turnover_chart_live = (turnover_bar + turnover_text)
 
 
-    # with sep2:
-    #     st.markdown(
-    #         "<div style='width:1px; background:#CCC; height:100%; margin:0 auto;'></div>",
-    #         unsafe_allow_html=True,
-    #     )
+        # Layout: 5 columns (chart | sep | table | sep | adv/decline)
+        col1,col2, col3, col4 = st.columns( [10, 3,3, 3])
 
-    with col2:
+        with col1:
             with st.container(border=True):
-                st.altair_chart(adv_dec_chart, use_container_width=True)
+                st.altair_chart(bubble_chart, use_container_width=True)
 
-    with col3:
-        with st.container(border=True):
-            st.altair_chart(turnover_chart_live, use_container_width=True)
-
-    with col4:
-        df_display = df.sort_values("VALUE", ascending=False).reset_index(drop=True).drop(columns=["Color"])
-        st.dataframe(df_display)
+        # with sep1:
+        #     st.markdown(
+        #         "<div style='width:1px; background:#CCC; height:100%; margin:0 auto;'></div>",
+        #         unsafe_allow_html=True,
+        #     )
 
 
-except Exception as e:
-    st.error(f"Error loading live market data: {e}")
+        # with sep2:
+        #     st.markdown(
+        #         "<div style='width:1px; background:#CCC; height:100%; margin:0 auto;'></div>",
+        #         unsafe_allow_html=True,
+        #     )
+
+        with col2:
+                with st.container(border=True):
+                    st.altair_chart(adv_dec_chart, use_container_width=True)
+
+        with col3:
+            with st.container(border=True):
+                st.altair_chart(turnover_chart_live, use_container_width=True)
+
+
+        with col4:
+            df_display = df.sort_values("VALUE", ascending=False).reset_index(drop=True).drop(columns=["Color"])
+            st.dataframe(df_display)
+
+        # ===== Range and Turnover Bar Charts for Live NSE Data =====
+        # Use same bins and labels as pre-open section
+        bins = [-20, -10, -5, -3, -1, 0, 1, 3, 5, 10, 20]
+        labels = [
+            "-20% to -10%",
+            "-10% to -5%",
+            "-5% to -3%",
+            "-3% to -1%",
+            "-1% to 0%",
+            "0% to 1%",
+            "1% to 3%",
+            "3% to 5%",
+            "5% to 10%",
+            "10% to 20%",
+        ]
+        df_full_live = df.copy()
+        df_full_live["range"] = pd.cut(df_full_live["%CHNG"], bins=bins, labels=labels, include_lowest=True)
+        bucket_counts_live = (
+            df_full_live.groupby("range")
+            .agg(count=("range", "size"), total_value=("VALUE", "sum"))
+            .reset_index()
+        )
+        bucket_counts_live["range"] = pd.Categorical(bucket_counts_live["range"], categories=labels, ordered=True)
+        bucket_counts_live = bucket_counts_live.sort_values("range")
+        bucket_counts_live["total_value_label"] = bucket_counts_live["total_value"].map(lambda x: f"{x:,.0f} cr")
+
+        range_chart_live = (
+            alt.Chart(bucket_counts_live)
+            .mark_bar(cornerRadius=8)
+            .encode(
+                y=alt.Y(
+                    "range:N",
+                    sort=labels,
+                    title="% Change bucket",
+                    axis=alt.Axis(labelFontSize=13, titleFontSize=15),
+                ),
+                x=alt.X(
+                    "count:Q",
+                    title="Number of stocks",
+                    axis=alt.Axis(labelFontSize=13, titleFontSize=15),
+                ),
+                color=alt.condition(
+                    alt.FieldOneOfPredicate(field="range", oneOf=["0% to 1%", "1% to 3%", "3% to 5%", "5% to 10%", "10% to 20%"]),
+                    alt.value("#2ca02c"),
+                    alt.value("#d62728"),
+                ),
+                tooltip=["range", "count", "total_value_label"],
+            )
+            .properties(
+                title="Live Stock Count by % Change Bucket",
+                height=360,
+                width="container",
+            )
+        )
+        count_text_live = (
+            alt.Chart(bucket_counts_live)
+            .mark_text(dx=5, align="left", color="white", fontWeight="bold", fontSize=13)
+            .encode(
+                y=alt.Y("range:N", sort=labels),
+                x=alt.X("count:Q"),
+                text=alt.Text("count:Q", format="d"),
+            )
+        )
+        range_chart_live = range_chart_live + count_text_live
+
+        turnover_range_chart_live = (
+            alt.Chart(bucket_counts_live)
+            .mark_bar(cornerRadius=8)
+            .encode(
+                y=alt.Y(
+                    "range:N",
+                    sort=labels,
+                    title="% Change bucket",
+                    axis=alt.Axis(labelFontSize=13, titleFontSize=15),
+                ),
+                x=alt.X(
+                    "total_value:Q",
+                    title="Total Turnover (Cr)",
+                    axis=alt.Axis(labelFontSize=13, titleFontSize=15),
+                ),
+                color=alt.condition(
+                    alt.FieldOneOfPredicate(field="range", oneOf=["0% to 1%", "1% to 3%", "3% to 5%", "5% to 10%", "10% to 20%"]),
+                    alt.value("#1f77b4"),
+                    alt.value("#ff7f0e"),
+                ),
+                tooltip=["range", "total_value_label"],
+            )
+            .properties(
+                title="Live Turnover by % Change Bucket",
+                height=360,
+                width="container",
+            )
+        )
+        turnover_text_live = (
+            alt.Chart(bucket_counts_live)
+            .mark_text(dx=5, align="left", color="white", fontWeight="bold", fontSize=13)
+            .encode(
+                y=alt.Y("range:N", sort=labels),
+                x=alt.X("total_value:Q"),
+                text=alt.Text("total_value_label:N"),
+            )
+        )
+        turnover_range_chart_live = turnover_range_chart_live + turnover_text_live
+
+        # Display side by side below main live market charts
+        range_col1_live, r_col2_live = st.columns([10, 10])
+        with range_col1_live:
+            with st.container(border=True):
+                st.altair_chart(range_chart_live, use_container_width=True)
+        with r_col2_live:
+            with st.container(border=True):
+                st.altair_chart(turnover_range_chart_live, use_container_width=True)
+
+    except Exception as e:
+        st.error(f"Error loading live market data: {e}")
 
 
