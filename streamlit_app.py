@@ -45,286 +45,286 @@ st.set_page_config(
 ## ⚡ Stock peer analysis
 
 """
-with st.expander("", expanded=True):
-    """
-    # :material/query_stats: Stock peer analysis
+# with st.expander("", expanded=True):
+#     """
+#     # :material/query_stats: Stock peer analysis
 
-    Easily compare stocks against others in their peer group.
-    """
+#     Easily compare stocks against others in their peer group.
+#     """
 
-    ""  # Add some space.
+#     ""  # Add some space.
 
-    cols = st.columns([1, 3])
-    # Will declare right cell later to avoid showing it when no data.
+#     cols = st.columns([1, 3])
+#     # Will declare right cell later to avoid showing it when no data.
 
-    STOCKS = [
-        "M&M",
-        "ETERNAL",
-        "EICHERMOT",
-        "SHRIRAMFIN",
-        "INDIGO",
-        "ADANIENT",
-        "BAJFINANCE",
-        "TMPV",
-        "LT",
-        "TRENT",
-        "BAJAJ-AUTO",
-        "HINDALCO",
-        "TITAN",
-        "SBIN",
-        "TATASTEEL",
-        "ADANIPORTS",
-        "JIOFIN",
-        "BAJAJFINSV",
-        "SUNPHARMA",
-        "DRREDDY",
-        "MARUTI",
-        "BHARTIARTL",
-        "APOLLOHOSP",
-        "ICICIBANK",
-        "HINDUNILVR",
-        "AXISBANK",
-        "RELIANCE",
-        "KOTAKBANK",
-        "JSWSTEEL",
-        "SBILIFE",
-        "ITC",
-        "GRASIM",
-        "MAXHEALTH",
-        "BEL",
-        "HDFCBANK",
-        "ASIANPAINT",
-        "ULTRACEMCO",
-        "COALINDIA",
-        "POWERGRID",
-        "CIPLA",
-        "HDFCLIFE",
-        "WIPRO",
-        "NTPC",
-        "TCS",
-        "TATACONSUM",
-        "NESTLEIND",
-        "ONGC",
-        "INFY",
-        "TECHM",
-        "HCLTECH"
-    ]
+#     STOCKS = [
+#         "M&M",
+#         "ETERNAL",
+#         "EICHERMOT",
+#         "SHRIRAMFIN",
+#         "INDIGO",
+#         "ADANIENT",
+#         "BAJFINANCE",
+#         "TMPV",
+#         "LT",
+#         "TRENT",
+#         "BAJAJ-AUTO",
+#         "HINDALCO",
+#         "TITAN",
+#         "SBIN",
+#         "TATASTEEL",
+#         "ADANIPORTS",
+#         "JIOFIN",
+#         "BAJAJFINSV",
+#         "SUNPHARMA",
+#         "DRREDDY",
+#         "MARUTI",
+#         "BHARTIARTL",
+#         "APOLLOHOSP",
+#         "ICICIBANK",
+#         "HINDUNILVR",
+#         "AXISBANK",
+#         "RELIANCE",
+#         "KOTAKBANK",
+#         "JSWSTEEL",
+#         "SBILIFE",
+#         "ITC",
+#         "GRASIM",
+#         "MAXHEALTH",
+#         "BEL",
+#         "HDFCBANK",
+#         "ASIANPAINT",
+#         "ULTRACEMCO",
+#         "COALINDIA",
+#         "POWERGRID",
+#         "CIPLA",
+#         "HDFCLIFE",
+#         "WIPRO",
+#         "NTPC",
+#         "TCS",
+#         "TATACONSUM",
+#         "NESTLEIND",
+#         "ONGC",
+#         "INFY",
+#         "TECHM",
+#         "HCLTECH"
+#     ]
 
-    DEFAULT_STOCKS = ["HDFCBANK", "TECHM", "NESTLEIND", "ULTRACEMCO", "HINDUNILVR", "RELIANCE", "ONGC"]
+#     DEFAULT_STOCKS = ["HDFCBANK", "TECHM", "NESTLEIND", "ULTRACEMCO", "HINDUNILVR", "RELIANCE", "ONGC"]
 
-    def stocks_to_str(stocks):
-        return ",".join(stocks)
+#     def stocks_to_str(stocks):
+#         return ",".join(stocks)
 
-    if "tickers_input" not in st.session_state:
-        st.session_state.tickers_input = st.query_params.get(
-            "stocks", stocks_to_str(DEFAULT_STOCKS)
-        ).split(",")
+#     if "tickers_input" not in st.session_state:
+#         st.session_state.tickers_input = st.query_params.get(
+#             "stocks", stocks_to_str(DEFAULT_STOCKS)
+#         ).split(",")
 
-    # Callback to update query param when input changes
-    def update_query_param():
-        if st.session_state.tickers_input:
-            st.query_params["stocks"] = stocks_to_str(st.session_state.tickers_input)
-        else:
-            st.query_params.pop("stocks", None)
+#     # Callback to update query param when input changes
+#     def update_query_param():
+#         if st.session_state.tickers_input:
+#             st.query_params["stocks"] = stocks_to_str(st.session_state.tickers_input)
+#         else:
+#             st.query_params.pop("stocks", None)
 
-    top_left_cell = cols[0].container(
-        border=True, height="stretch"  # Removed vertical_alignment="center" as it's not valid for st.container()
-    )
+#     top_left_cell = cols[0].container(
+#         border=True, height="stretch"  # Removed vertical_alignment="center" as it's not valid for st.container()
+#     )
 
-    with top_left_cell:
-        # Selectbox for stock tickers
-        tickers = st.multiselect(
-            "Stock tickers",
-            options=sorted(set(STOCKS) | set(st.session_state.tickers_input)),
-            default=st.session_state.tickers_input,
-            placeholder="Choose stocks to compare. Example: NVDA",
-            # Removed accept_new_options=True as it's not valid for st.multiselect()
-        )
+#     with top_left_cell:
+#         # Selectbox for stock tickers
+#         tickers = st.multiselect(
+#             "Stock tickers",
+#             options=sorted(set(STOCKS) | set(st.session_state.tickers_input)),
+#             default=st.session_state.tickers_input,
+#             placeholder="Choose stocks to compare. Example: NVDA",
+#             # Removed accept_new_options=True as it's not valid for st.multiselect()
+#         )
 
-    # Time horizon selector
-    horizon_map = {
-        "1 Day": one_day,
-        "1 Week": one_week,
-        "1 Months": one_month,
-        "3 Months": three_months,
-        "6 Months": six_months,
-        "1 Year": one_year,
-        "3 Years": three_years,
-        "5 Years": five_years,
-        "10 Years": ten_years,
-        "20 Years": twenty_years
-    }
+#     # Time horizon selector
+#     horizon_map = {
+#         "1 Day": one_day,
+#         "1 Week": one_week,
+#         "1 Months": one_month,
+#         "3 Months": three_months,
+#         "6 Months": six_months,
+#         "1 Year": one_year,
+#         "3 Years": three_years,
+#         "5 Years": five_years,
+#         "10 Years": ten_years,
+#         "20 Years": twenty_years
+#     }
 
-    with top_left_cell:
-        # Buttons for picking time horizon
-        horizon = st.pills(
-            "Time horizon",
-            options=list(horizon_map.keys()),
-            default="1 Months",
-        )
+#     with top_left_cell:
+#         # Buttons for picking time horizon
+#         horizon = st.pills(
+#             "Time horizon",
+#             options=list(horizon_map.keys()),
+#             default="1 Months",
+#         )
 
-    # Interval selector (single select)
-    interval_options = ["15minute", "30minute", "60minute", "day", "week"]
-    with top_left_cell:
-        interval = st.pills(
-            "Interval",
-            options=interval_options,
-            default="day",
-        )
+#     # Interval selector (single select)
+#     interval_options = ["15minute", "30minute", "60minute", "day", "week"]
+#     with top_left_cell:
+#         interval = st.pills(
+#             "Interval",
+#             options=interval_options,
+#             default="day",
+#         )
 
-    tickers = [t.upper() for t in tickers]
+#     tickers = [t.upper() for t in tickers]
 
-    # Update query param when text input changes
-    if tickers:
-        st.query_params["stocks"] = stocks_to_str(tickers)
-    else:
-        # Clear the param if input is empty
-        st.query_params.pop("stocks", None)
+#     # Update query param when text input changes
+#     if tickers:
+#         st.query_params["stocks"] = stocks_to_str(tickers)
+#     else:
+#         # Clear the param if input is empty
+#         st.query_params.pop("stocks", None)
 
-    if not tickers:
-        top_left_cell.info("Pick some stocks to compare", icon=":material/info:")
-        st.stop()
+#     if not tickers:
+#         top_left_cell.info("Pick some stocks to compare", icon=":material/info:")
+#         st.stop()
 
-    right_cell = cols[1].container(
-        border=True, height="stretch"  # Removed vertical_alignment="center" as it's not valid
-    )
+#     right_cell = cols[1].container(
+#         border=True, height="stretch"  # Removed vertical_alignment="center" as it's not valid
+#     )
 
-    # load_data function is imported from zerodha_data module
+#     # load_data function is imported from zerodha_data module
 
-    # Load the data
-    try:
-        tickers_with_nifty = tickers + ["NIFTY 50"]
-        data = load_data(tickers_with_nifty, from_date=horizon_map[horizon], interval=interval)
-    except Exception as e:
-        st.error(f"Error loading data: {str(e)}")
-        st.stop()
+#     # Load the data
+#     try:
+#         tickers_with_nifty = tickers + ["NIFTY 50"]
+#         data = load_data(tickers_with_nifty, from_date=horizon_map[horizon], interval=interval)
+#     except Exception as e:
+#         st.error(f"Error loading data: {str(e)}")
+#         st.stop()
 
-    empty_columns = data.columns[data.isna().all()].tolist()
+#     empty_columns = data.columns[data.isna().all()].tolist()
 
-    if empty_columns:
-        st.error(f"Error loading data for the tickers: {', '.join(empty_columns)}.")
-        st.stop()
+#     if empty_columns:
+#         st.error(f"Error loading data for the tickers: {', '.join(empty_columns)}.")
+#         st.stop()
 
-    # Normalize prices (start at 1)
-    normalized = data.div(data.iloc[0])
+#     # Normalize prices (start at 1)
+#     normalized = data.div(data.iloc[0])
 
-    latest_norm_values = {normalized[ticker].iat[-1]: ticker for ticker in tickers}
-    max_norm_value = max(latest_norm_values.items())
-    min_norm_value = min(latest_norm_values.items())
+#     latest_norm_values = {normalized[ticker].iat[-1]: ticker for ticker in tickers}
+#     max_norm_value = max(latest_norm_values.items())
+#     min_norm_value = min(latest_norm_values.items())
 
-    bottom_left_cell = cols[0].container(
-        border=True, height="stretch"  # Removed vertical_alignment="center"
-    )
+#     bottom_left_cell = cols[0].container(
+#         border=True, height="stretch"  # Removed vertical_alignment="center"
+#     )
 
-    with bottom_left_cell:
-        cols = st.columns(2)
-        cols[0].metric(
-            "Best stock",
-            max_norm_value[1],
-            delta=f"{round(max_norm_value[0] * 100)}%",
-            width="content",
-        )
-        cols[1].metric(
-            "Worst stock",
-            min_norm_value[1],
-            delta=f"{round(min_norm_value[0] * 100)}%",
-            width="content",
-        )
+#     with bottom_left_cell:
+#         cols = st.columns(2)
+#         cols[0].metric(
+#             "Best stock",
+#             max_norm_value[1],
+#             delta=f"{round(max_norm_value[0] * 100)}%",
+#             width="content",
+#         )
+#         cols[1].metric(
+#             "Worst stock",
+#             min_norm_value[1],
+#             delta=f"{round(min_norm_value[0] * 100)}%",
+#             width="content",
+#         )
 
-    # Plot normalized prices
-    with right_cell:
-        st.altair_chart(
-            alt.Chart(
-                normalized.reset_index().melt(
-                    id_vars=["Date"], var_name="Stock", value_name="Normalized price"
-                )
-            )
-            .mark_line()
-            .encode(
-                alt.X("Date:T"),
-                alt.Y("Normalized price:Q").scale(zero=False),
-                alt.Color("Stock:N"),
-            )
-            .properties(height=400)
-        )
+#     # Plot normalized prices
+#     with right_cell:
+#         st.altair_chart(
+#             alt.Chart(
+#                 normalized.reset_index().melt(
+#                     id_vars=["Date"], var_name="Stock", value_name="Normalized price"
+#                 )
+#             )
+#             .mark_line()
+#             .encode(
+#                 alt.X("Date:T"),
+#                 alt.Y("Normalized price:Q").scale(zero=False),
+#                 alt.Color("Stock:N"),
+#             )
+#             .properties(height=400)
+#         )
 
-    ""
-    ""
-"""
-## ⚡ Individual stocks vs Nifty50
+#     ""
+#     ""
+# """
+# ## ⚡ Individual stocks vs Nifty50
 
-"""
-with st.expander("", expanded=True):
-    # Plot individual stock vs peer average
-    """
+# """
+# with st.expander("", expanded=True):
+#     # Plot individual stock vs peer average
+#     """
 
-    For the analysis below, each stock is compared against the Nifty50 index.
-    """
+#     For the analysis below, each stock is compared against the Nifty50 index.
+#     """
 
-    if len(tickers) <= 1:
-        st.warning("Pick 2 or more tickers to compare them")
-        st.stop()
+#     if len(tickers) <= 1:
+#         st.warning("Pick 2 or more tickers to compare them")
+#         st.stop()
 
-    NUM_COLS = 4
-    cols = st.columns(NUM_COLS)
+#     NUM_COLS = 4
+#     cols = st.columns(NUM_COLS)
 
-    for i, ticker in enumerate(tickers):
-        # Use Nifty50 instead of peer average
-        nifty_data = normalized["NIFTY 50"]
+#     for i, ticker in enumerate(tickers):
+#         # Use Nifty50 instead of peer average
+#         nifty_data = normalized["NIFTY 50"]
 
-        # Create DataFrame with Nifty50.
-        plot_data = pd.DataFrame(
-            {
-                "Date": normalized.index,
-                ticker: normalized[ticker],
-                "Nifty50": nifty_data,
-            }
-        ).melt(id_vars=["Date"], var_name="Series", value_name="Price")
+#         # Create DataFrame with Nifty50.
+#         plot_data = pd.DataFrame(
+#             {
+#                 "Date": normalized.index,
+#                 ticker: normalized[ticker],
+#                 "Nifty50": nifty_data,
+#             }
+#         ).melt(id_vars=["Date"], var_name="Series", value_name="Price")
 
-        chart = (
-            alt.Chart(plot_data)
-            .mark_line()
-            .encode(
-                alt.X("Date:T"),
-                alt.Y("Price:Q").scale(zero=False),
-                alt.Color(
-                    "Series:N",
-                    scale=alt.Scale(domain=[ticker, "Nifty50"], range=["red", "blue"]),
-                    legend=alt.Legend(orient="bottom"),
-                ),
-                alt.Tooltip(["Date", "Series", "Price"]),
-            )
-            .properties(title=f"{ticker} vs Nifty50", height=300)
-        )
+#         chart = (
+#             alt.Chart(plot_data)
+#             .mark_line()
+#             .encode(
+#                 alt.X("Date:T"),
+#                 alt.Y("Price:Q").scale(zero=False),
+#                 alt.Color(
+#                     "Series:N",
+#                     scale=alt.Scale(domain=[ticker, "Nifty50"], range=["red", "blue"]),
+#                     legend=alt.Legend(orient="bottom"),
+#                 ),
+#                 alt.Tooltip(["Date", "Series", "Price"]),
+#             )
+#             .properties(title=f"{ticker} vs Nifty50", height=300)
+#         )
 
-        cell = cols[(i * 2) % NUM_COLS].container(border=True)
-        cell.write("")
-        cell.altair_chart(chart, use_container_width=True)
+#         cell = cols[(i * 2) % NUM_COLS].container(border=True)
+#         cell.write("")
+#         cell.altair_chart(chart, use_container_width=True)
 
-        # Create Delta chart
-        plot_data = pd.DataFrame(
-            {
-                "Date": normalized.index,
-                "Delta": normalized[ticker] - nifty_data,
-            }
-        )
+#         # Create Delta chart
+#         plot_data = pd.DataFrame(
+#             {
+#                 "Date": normalized.index,
+#                 "Delta": normalized[ticker] - nifty_data,
+#             }
+#         )
 
-        chart = (
-            alt.Chart(plot_data)
-            .mark_area()
-            .encode(
-                alt.X("Date:T"),
-                alt.Y("Delta:Q").scale(zero=False),
-            )
-            .properties(title=f"{ticker} minus Nifty50", height=300)
-        )
+#         chart = (
+#             alt.Chart(plot_data)
+#             .mark_area()
+#             .encode(
+#                 alt.X("Date:T"),
+#                 alt.Y("Delta:Q").scale(zero=False),
+#             )
+#             .properties(title=f"{ticker} minus Nifty50", height=300)
+#         )
 
-        cell = cols[(i * 2 + 1) % NUM_COLS].container(border=True)
-        cell.write("")
-        cell.altair_chart(chart, use_container_width=True)
+#         cell = cols[(i * 2 + 1) % NUM_COLS].container(border=True)
+#         cell.write("")
+#         cell.altair_chart(chart, use_container_width=True)
 
-    ""
-    ""
+#     ""
+#     ""
 
 # data
 
@@ -592,9 +592,9 @@ with st.expander("", expanded=True):
         # with col1:
         #     st.altair_chart(bubble_chart, width="stretch", use_container_width=True)
 
-        with col1:
-            with st.container(border=True):
-                st.altair_chart(bubble_chart, use_container_width=True)
+        # with col1:
+        #     with st.container(border=True):
+        #         st.altair_chart(bubble_chart, use_container_width=True)
 
         # with sep1:
         #     st.markdown(
@@ -653,7 +653,7 @@ with st.expander("", expanded=True):
     if "selected_index" not in st.session_state:
         st.session_state.selected_index = "NIFTY 50"  # Default
 
-    index_options = ["SECURITIES IN F&O","NIFTY 50", "NIFTY BANK", "NIFTY IT", "NIFTY AUTO", "NIFTY ENERGY", "NIFTY OIL & GAS"]  # Add more as needed
+    index_options = ["NIFTY 500","SECURITIES IN F&O","NIFTY 50", "NIFTY BANK", "NIFTY IT", "NIFTY AUTO", "NIFTY ENERGY", "NIFTY OIL & GAS"]  # Add more as needed
     selected_index = st.pills(
         "Select Index",
         options=sorted(set(index_options) | {st.session_state.selected_index}),
@@ -673,13 +673,28 @@ with st.expander("", expanded=True):
             st.error("Unexpected data format from get_live_nse_data")
             st.stop()
 
+
         # Prepare df for charts
         df = df.copy()
         df["%CHNG"] = pd.to_numeric(df["%CHNG"], errors="coerce")
         df["VALUE"] = pd.to_numeric(df["VALUE"], errors="coerce")
         df = df.dropna()
         df = df[df["VALUE"] > 0]
-        df = df.sort_values("%CHNG", key=abs, ascending=False).head(20)
+
+
+        # Add toggle to exclude F&O stocks from NIFTY 500
+        exclude_fno = False
+        if st.session_state.selected_index == "NIFTY 500":
+            exclude_fno = st.toggle("Exclude F&O stocks from NIFTY 500", value=True)
+            if exclude_fno:
+                try:
+                    fno_df = pd.read_csv("symbol_data/fno.csv")
+                    fno_symbols = set(fno_df["SYMBOL"].str.upper())
+                    df = df[~df["SYMBOL"].str.upper().isin(fno_symbols)]
+                except Exception as e:
+                    st.warning(f"Could not filter F&O stocks: {e}")
+
+        # Show all stocks for the bubble chart, not just top 20
         df["Color"] = df["%CHNG"].apply(lambda x: "Gain" if x > 0 else "Loss")
 
         # Dynamic Y-axis ticks
@@ -687,19 +702,33 @@ with st.expander("", expanded=True):
         max_val = round(max_val + 0.5)
         ticks = np.arange(-max_val, max_val + 0.5, 0.5)
 
-        # Bubble chart
-        bubble_chart = (
-            alt.Chart(df)
+
+        # Bubble chart for all stocks, bubble size = VALUE
+        # Add labels only for top 20 by VALUE
+
+        df_sorted = df.sort_values("VALUE", ascending=False).copy()
+        df_sorted["SHOW_LABEL"] = False
+        # Assign rank 1-20 to top 20
+        df_sorted.loc[df_sorted.index[:20], "SHOW_LABEL"] = True
+        df_sorted.loc[df_sorted.index[:20], "RANK"] = range(1, 21)
+        # Create label as 'rank. SYMBOL' for top 20, else blank
+        df_sorted["LABEL"] = df_sorted.apply(
+            lambda row: f"{int(row['RANK'])}. {row['SYMBOL']}" if row["SHOW_LABEL"] and not pd.isna(row["RANK"]) else "",
+            axis=1
+        )
+
+        bubble = (
+            alt.Chart(df_sorted)
             .mark_circle(opacity=0.7)
             .encode(
-                x=alt.X("SYMBOL:N", title="Stock"),
+                x=alt.X("SYMBOL:N", axis=None),
                 y=alt.Y(
                     "%CHNG:Q",
                     title="% Change",
                     scale=alt.Scale(domain=[-max_val, max_val]),
                     axis=alt.Axis(values=ticks)
                 ),
-                size=alt.Size("VALUE:Q", scale=alt.Scale(range=[100, 2000]), legend=None),
+                size=alt.Size("VALUE:Q", scale=alt.Scale(range=[200, 4000]), legend=None),
                 color=alt.Color(
                     "Color:N",
                     scale=alt.Scale(domain=["Gain", "Loss"], range=["green", "red"]),
@@ -707,9 +736,29 @@ with st.expander("", expanded=True):
                 ),
                 tooltip=["SYMBOL", "%CHNG", "VALUE"]
             )
-            .properties(height=400)
+            .properties(height=600)
             .interactive()
         )
+
+        # Add text labels only for top 20
+        text = (
+            alt.Chart(df_sorted[df_sorted["SHOW_LABEL"]])
+            .mark_text(
+                align="center",
+                baseline="middle",
+                fontWeight="bold",
+                fontSize=12,
+                dy=0,
+                color="white"
+            )
+            .encode(
+                x=alt.X("SYMBOL:N", axis=None),
+                y=alt.Y("%CHNG:Q"),
+                text=alt.Text("LABEL:N")
+            )
+        )
+
+        bubble_chart = bubble + text
 
         # Advance/Decline counts
         counts_df = pd.DataFrame(
@@ -802,9 +851,9 @@ with st.expander("", expanded=True):
         # Layout: 5 columns (chart | sep | table | sep | adv/decline)
         col1,col2, col3, col4 = st.columns( [10, 3,3, 3])
 
-        with col1:
-            with st.container(border=True):
-                st.altair_chart(bubble_chart, use_container_width=True)
+        # with col1:
+        #     with st.container(border=True):
+        #         st.altair_chart(bubble_chart, use_container_width=True)
 
         # with sep1:
         #     st.markdown(
@@ -819,15 +868,19 @@ with st.expander("", expanded=True):
         #         unsafe_allow_html=True,
         #     )
 
-        with col2:
-                with st.container(border=True):
-                    st.altair_chart(adv_dec_chart, use_container_width=True)
+        # Show bubble chart in a separate row, full width
+        st.markdown("### Market Bubble Chart (All Stocks)")
+        with st.container(border=True):
+            st.altair_chart(bubble_chart, width='stretch')
 
+        # Layout: 3 columns for other charts/tables
+        col2, col3, col4 = st.columns([3, 3, 3])
+        with col2:
+            with st.container(border=True):
+                st.altair_chart(adv_dec_chart, width='stretch')
         with col3:
             with st.container(border=True):
-                st.altair_chart(turnover_chart_live, use_container_width=True)
-
-
+                st.altair_chart(turnover_chart_live, width='stretch')
         with col4:
             df_display = df.sort_values("VALUE", ascending=False).reset_index(drop=True).drop(columns=["Color"])
             st.dataframe(df_display)
