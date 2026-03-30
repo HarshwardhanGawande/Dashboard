@@ -269,7 +269,9 @@ def get_pre_open_data():
         df = df[['SYMBOL','%CHNG', 'VALUE']]
         df["%CHNG"] = pd.to_numeric(df["%CHNG"], errors="coerce")
         df["VALUE"] = pd.to_numeric(df["VALUE"], errors="coerce")
-
+        print("---------------------------------------------------------------")
+        print("Number of rows in pre-open data:", df)
+        print("---------------------------------------------------------------")
         df_advance = df[df['%CHNG'] > 0]   # DataFrame
         df_decline = df[df['%CHNG'] < 0]   # DataFrame
 
