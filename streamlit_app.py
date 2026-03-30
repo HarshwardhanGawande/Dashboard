@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 # Copyright 2024-2025 Streamlit Inc.
 #
@@ -17,7 +18,7 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 from datetime import date, timedelta
-from zerodha_data import load_data, get_pre_open_data
+from zerodha_data import load_data, get_pre_open_data_cached
 import requests
 from io import StringIO
 import numpy as np
@@ -339,7 +340,7 @@ st.set_page_config(
 """
 with st.expander("", expanded=True):
     try:
-        pre_open = get_pre_open_data()
+        pre_open = get_pre_open_data_cached()
         df1 = pre_open[0]
         advance_count = pre_open[1]
         decline_count = pre_open[2]
@@ -366,7 +367,7 @@ with st.expander("", expanded=True):
         df_full["range"] = pd.cut(df_full["%CHNG"], bins=bins, labels=labels, include_lowest=True)
 
         bucket_counts = (
-            df_full.groupby("range")
+            df_full.groupby("range", observed=False)
             .agg(count=("range", "size"), total_value=("VALUE", "sum"))
             .reset_index()
         )
@@ -649,30 +650,43 @@ with st.expander("", expanded=True):
 
 """
 # Index selector (single select, like stock ticker but for one index)
+@st.cache_data(show_spinner=False, ttl=300)
+def cached_get_live_nse_data(selected_index):
+    from zerodha_data import get_live_nse_data
+    return get_live_nse_data(selected_index)
+
+
+"""
+## ⚡ Live Market Data
+"""
+
 with st.expander("", expanded=True):
     if "selected_index" not in st.session_state:
-        st.session_state.selected_index = "NIFTY 50"  # Default
+        st.session_state.selected_index = "NIFTY 50"
 
-    index_options = ["NIFTY 500","SECURITIES IN F&O","NIFTY 50", "NIFTY BANK", "NIFTY IT", "NIFTY AUTO", "NIFTY ENERGY", "NIFTY OIL & GAS"]  # Add more as needed
+    index_options = ["NIFTY 500", "SECURITIES IN F&O", "NIFTY 50", "NIFTY BANK",
+                     "NIFTY IT", "NIFTY AUTO", "NIFTY ENERGY", "NIFTY OIL & GAS"]
+
     selected_index = st.pills(
         "Select Index",
-        options=sorted(set(index_options) | {st.session_state.selected_index}),
+        options=sorted(set(index_options)),
         default=st.session_state.selected_index,
+        key="index_pills"
     )
 
-    if selected_index:
-        st.session_state.selected_index = selected_index[0] if isinstance(selected_index, list) else selected_index
+    # Guard against None and avoid unnecessary state writes
+    if selected_index is None:
+        selected_index = st.session_state.selected_index
+    elif selected_index != st.session_state.selected_index:
+        st.session_state.selected_index = selected_index
 
     try:
-        from zerodha_data import get_live_nse_data
-        result = get_live_nse_data(selected_index)
-
+        result = cached_get_live_nse_data(selected_index)
         if isinstance(result, tuple) and len(result) == 5:
             df, df_advance, df_decline, percent_advance_turnover_live, percent_decline_turnover_live = result
         else:
             st.error("Unexpected data format from get_live_nse_data")
             st.stop()
-
 
         # Prepare df for charts
         df = df.copy()
@@ -680,7 +694,6 @@ with st.expander("", expanded=True):
         df["VALUE"] = pd.to_numeric(df["VALUE"], errors="coerce")
         df = df.dropna()
         df = df[df["VALUE"] > 0]
-
 
         # Add toggle to exclude F&O stocks from NIFTY 500
         exclude_fno = False
@@ -702,21 +715,21 @@ with st.expander("", expanded=True):
         max_val = round(max_val + 0.5)
         ticks = np.arange(-max_val, max_val + 0.5, 0.5)
 
-
         # Bubble chart for all stocks, bubble size = VALUE
         # Add labels only for top 20 by VALUE
-
         df_sorted = df.sort_values("VALUE", ascending=False).copy()
         df_sorted["SHOW_LABEL"] = False
-        # Assign rank 1-20 to top 20
-        df_sorted.loc[df_sorted.index[:20], "SHOW_LABEL"] = True
-        df_sorted.loc[df_sorted.index[:20], "RANK"] = range(1, 21)
-        # Create label as 'rank. SYMBOL' for top 20, else blank
+        df_sorted["RANK"] = np.nan
+        df_sorted["LABEL"] = ""
+
+        top_n = min(20, len(df_sorted))
+
+        df_sorted.iloc[:top_n, df_sorted.columns.get_loc("SHOW_LABEL")] = True
+        df_sorted.iloc[:top_n, df_sorted.columns.get_loc("RANK")] = range(1, top_n + 1)
         df_sorted["LABEL"] = df_sorted.apply(
             lambda row: f"{int(row['RANK'])}. {row['SYMBOL']}" if row["SHOW_LABEL"] and not pd.isna(row["RANK"]) else "",
             axis=1
         )
-
         bubble = (
             alt.Chart(df_sorted)
             .mark_circle(opacity=0.7)
@@ -800,20 +813,16 @@ with st.expander("", expanded=True):
             )
         )
 
-        # Combine bar and text
         adv_dec_chart = (bar + text).properties(
             height=320,
             width="container",
             title="Advance vs Decline",
         )
 
-        # # Display percent_advance_turnover as a metric
-        # st.metric("Advance Turnover %", f"{percent_advance_turnover:.2f}%")
-
         turnover_df = pd.DataFrame({
-                "Status": ["Advance", "Decline"],
-                "Turnover": [percent_advance_turnover_live, percent_decline_turnover_live],
-            })
+            "Status": ["Advance", "Decline"],
+            "Turnover": [percent_advance_turnover_live, percent_decline_turnover_live],
+        })
 
         turnover_bar = (
             alt.Chart(turnover_df)
@@ -847,28 +856,7 @@ with st.expander("", expanded=True):
 
         turnover_chart_live = (turnover_bar + turnover_text)
 
-
-        # Layout: 5 columns (chart | sep | table | sep | adv/decline)
-        col1,col2, col3, col4 = st.columns( [10, 3,3, 3])
-
-        # with col1:
-        #     with st.container(border=True):
-        #         st.altair_chart(bubble_chart, use_container_width=True)
-
-        # with sep1:
-        #     st.markdown(
-        #         "<div style='width:1px; background:#CCC; height:100%; margin:0 auto;'></div>",
-        #         unsafe_allow_html=True,
-        #     )
-
-
-        # with sep2:
-        #     st.markdown(
-        #         "<div style='width:1px; background:#CCC; height:100%; margin:0 auto;'></div>",
-        #         unsafe_allow_html=True,
-        #     )
-
-        # Show bubble chart in a separate row, full width
+        # Show bubble chart full width
         st.markdown("### Market Bubble Chart (All Stocks)")
         with st.container(border=True):
             st.altair_chart(bubble_chart, width='stretch')
@@ -885,8 +873,7 @@ with st.expander("", expanded=True):
             df_display = df.sort_values("VALUE", ascending=False).reset_index(drop=True).drop(columns=["Color"])
             st.dataframe(df_display)
 
-        # ===== Range and Turnover Bar Charts for Live NSE Data =====
-        # Use same bins and labels as pre-open section
+        # ===== Range and Turnover Bar Charts =====
         bins = [-20, -10, -5, -3, -1, 0, 1, 3, 5, 10, 20]
         labels = [
             "-20% to -10%",
@@ -903,7 +890,7 @@ with st.expander("", expanded=True):
         df_full_live = df.copy()
         df_full_live["range"] = pd.cut(df_full_live["%CHNG"], bins=bins, labels=labels, include_lowest=True)
         bucket_counts_live = (
-            df_full_live.groupby("range")
+            df_full_live.groupby("range", observed=False)
             .agg(count=("range", "size"), total_value=("VALUE", "sum"))
             .reset_index()
         )
@@ -989,16 +976,13 @@ with st.expander("", expanded=True):
         )
         turnover_range_chart_live = turnover_range_chart_live + turnover_text_live
 
-        # Display side by side below main live market charts
         range_col1_live, r_col2_live = st.columns([10, 10])
         with range_col1_live:
             with st.container(border=True):
-                st.altair_chart(range_chart_live, use_container_width=True)
+                st.altair_chart(range_chart_live, width='stretch')
         with r_col2_live:
             with st.container(border=True):
-                st.altair_chart(turnover_range_chart_live, use_container_width=True)
+                st.altair_chart(turnover_range_chart_live, width='stretch')
 
     except Exception as e:
         st.error(f"Error loading live market data: {e}")
-
-

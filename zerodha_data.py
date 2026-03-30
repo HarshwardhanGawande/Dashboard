@@ -298,6 +298,9 @@ def get_live_nse_data(index):
     """
     Fetches live market data for the specified index from NSE India and returns as DataFrame.
     """
+    print("----------------------------------------------------------------")
+    print(f"Fetching live data for index: {index}")
+    print("----------------------------------------------------------------")
     base_url = "https://www.nseindia.com/api/equity-stockIndices"
     params = {
         'index': index,  # Use the passed index parameter
@@ -323,6 +326,9 @@ def get_live_nse_data(index):
         # Set proper column names
         columns = ['SYMBOL', 'OPEN', 'HIGH', 'LOW', 'PREV. CLOSE', 'LTP', 'INDICATIVE CLOSE', 'CHNG', '%CHNG', 'VOLUME', 'VALUE', '52W H', '52W L', '30 D %CHNG', '365 D %CHNG']
         df.columns = columns
+        print("---------------------------------------------------------------")
+        print("Number of rows in live data:", df['SYMBOL'])
+        print("---------------------------------------------------------------")
         df = df.sort_values(by='VALUE', ascending=False).reset_index(drop=True)
         df = df[['SYMBOL','%CHNG', 'VALUE']]
         df["%CHNG"] = pd.to_numeric(df["%CHNG"], errors="coerce")
@@ -344,3 +350,7 @@ def get_live_nse_data(index):
         return pd.DataFrame()
 
 
+# In zerodha_data.py, add this wrapper:
+@st.cache_data(show_spinner=False, ttl=300)
+def get_pre_open_data_cached():
+    return get_pre_open_data()
