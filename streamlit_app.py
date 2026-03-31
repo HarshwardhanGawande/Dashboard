@@ -707,7 +707,7 @@ with st.expander("", expanded=True):
 
         if "selected_index" not in st.session_state:
             st.session_state.selected_index = "NIFTY"
-            
+
         preopen_index_options = ["ALL", "FO", "NIFTY", "BANKNIFTY", "OTHERS"]
 
         selected_preopen_index = st.pills(
@@ -717,19 +717,19 @@ with st.expander("", expanded=True):
             key="preopen_index_pills"
         )
 
-        if selected_preopen_index is None:
-            selected_preopen_index = st.session_state.preopen_index
-        elif selected_preopen_index != st.session_state.preopen_index:
-            st.session_state.preopen_index = selected_preopen_index
+        # if selected_preopen_index is None:
+        #     selected_preopen_index = st.session_state.preopen_index
+        # elif selected_preopen_index != st.session_state.preopen_index:
+        #     st.session_state.preopen_index = selected_preopen_index
 
-        # ── Toggle only for ALL ─────────────────────────────────────────
-        exclude_fno = False
-        if selected_preopen_index == "ALL":
-            exclude_fno = st.toggle(
-                "Exclude F&O stocks",
-                value=False,
-                key="preopen_exclude_fno"
-            )
+        # # ── Toggle only for ALL ─────────────────────────────────────────
+        # exclude_fno = False
+        # if selected_preopen_index == "ALL":
+        #     exclude_fno = st.toggle(
+        #         "Exclude F&O stocks",
+        #         value=False,
+        #         key="preopen_exclude_fno"
+        #     )
 
         # ── Fetch data for selected index ───────────────────────────────
         pre_open = get_pre_open_data_cached(selected_preopen_index)
