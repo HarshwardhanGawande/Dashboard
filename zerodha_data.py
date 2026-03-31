@@ -237,13 +237,15 @@ def _fetch_chunk(tickers, chunk_query, interval, headers):
         return chunk_df
 
 
-def get_pre_open_data():
+@st.cache_data(show_spinner=False, ttl=300)
+def get_pre_open_data_cached(index):
     """
     Fetches pre-open market data for F&O from NSE India and returns as DataFrame.
     """
+    print(f"Calling get_pre_open_data_cached() for index: {index}")
     base_url = "https://www.nseindia.com/api/market-data-pre-open"
     params = {
-        'key': 'FO',
+        'key': index,
         'csv': 'true',
         'selectValFormat': 'crores'
     }
@@ -251,35 +253,30 @@ def get_pre_open_data():
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
     }
-    # NSE requires establishing a session first
     session = requests.Session()
-    session.get("https://www.nseindia.com", headers=headers)  # Set cookies
+    session.get("https://www.nseindia.com", headers=headers)
 
     try:
-        response = session.get(url, headers=headers,)
+        response = session.get(url, headers=headers)
         response.raise_for_status()
-        print(f"Response status: {response.status_code}")
-        print(f"Response content type: {response.headers.get('content-type')}")
-        # print(f"First 500 chars: {response.text}")
+
         df = pd.read_csv(StringIO(response.text[160:]), header=None, sep=',', quotechar='"', on_bad_lines='skip')
-        # Set proper column names
         columns = ['SYMBOL', 'PREV_CLOSE', 'IEP', 'CHNG', '%CHNG', 'FINAL', 'FINAL_QUANTITY', 'VALUE', 'FFM_CAP', '52W_H', '52W_L']
         df.columns = columns
         df = df.sort_values(by='VALUE', ascending=False).reset_index(drop=True)
-        df = df[['SYMBOL','%CHNG', 'VALUE']]
+        df = df[['SYMBOL', '%CHNG', 'VALUE']]
         df["%CHNG"] = pd.to_numeric(df["%CHNG"], errors="coerce")
         df["VALUE"] = pd.to_numeric(df["VALUE"], errors="coerce")
-        print("---------------------------------------------------------------")
-        print("Number of rows in pre-open data:", df)
-        print("---------------------------------------------------------------")
-        df_advance = df[df['%CHNG'] > 0]   # DataFrame
-        df_decline = df[df['%CHNG'] < 0]   # DataFrame
 
-        advance_count = int(df_advance.shape[0])
-        decline_count = int(df_decline.shape[0])
+        # Fix: compute turnover BEFORE overwriting df_advance/df_decline with counts
+        df_advance_rows = df[df['%CHNG'] > 0]
+        df_decline_rows = df[df['%CHNG'] < 0]
 
-        advance_turnover = df_advance['VALUE'].sum()
-        decline_turnover = df_decline['VALUE'].sum()
+        advance_turnover = df_advance_rows['VALUE'].sum()
+        decline_turnover = df_decline_rows['VALUE'].sum()
+
+        advance_count = int(len(df_advance_rows))
+        decline_count = int(len(df_decline_rows))
 
         percent_advance_turnover = int(
             (advance_turnover / decline_turnover * 100)
@@ -291,8 +288,7 @@ def get_pre_open_data():
 
     except Exception as e:
         print(f"Error fetching pre-open data: {str(e)}")
-        print(f"Full response text: {response.text}")
-        return pd.DataFrame()
+        return pd.DataFrame(), 0, 0, 0, 0
 
 def get_live_nse_data(index):
     """
@@ -350,7 +346,7 @@ def get_live_nse_data(index):
         return pd.DataFrame()
 
 
-# In zerodha_data.py, add this wrapper:
-@st.cache_data(show_spinner=False, ttl=300)
-def get_pre_open_data_cached():
-    return get_pre_open_data()
+# # In zerodha_data.py, add this wrapper:
+# @st.cache_data(show_spinner=False, ttl=300)
+# def get_pre_open_data_cached():
+#     return get_pre_open_data()
