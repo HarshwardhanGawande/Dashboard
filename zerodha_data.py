@@ -261,6 +261,7 @@ def get_pre_open_data_cached(index):
         response.raise_for_status()
 
         df = pd.read_csv(StringIO(response.text[160:]), header=None, sep=',', quotechar='"', on_bad_lines='skip')
+
         columns = ['SYMBOL', 'PREV_CLOSE', 'IEP', 'CHNG', '%CHNG', 'FINAL', 'FINAL_QUANTITY', 'VALUE', 'FFM_CAP', '52W_H', '52W_L']
         df.columns = columns
         df = df.sort_values(by='VALUE', ascending=False).reset_index(drop=True)
@@ -324,12 +325,14 @@ def get_live_nse_data(index):
         columns = ['SYMBOL', 'OPEN', 'HIGH', 'LOW', 'PREV. CLOSE', 'LTP', 'INDICATIVE CLOSE', 'CHNG', '%CHNG', 'VOLUME', 'VALUE', '52W H', '52W L', '30 D %CHNG', '365 D %CHNG']
         df.columns = columns
         print("---------------------------------------------------------------")
-        print("Number of rows in live data:", df['SYMBOL'])
+        print("Number of rows in live data:", df.shape[0])
         print("---------------------------------------------------------------")
         df = df.sort_values(by='VALUE', ascending=False).reset_index(drop=True)
-        df = df[['SYMBOL','%CHNG', 'VALUE']]
+        df = df[['SYMBOL','%CHNG', 'VALUE', "LTP"]]
         df["%CHNG"] = pd.to_numeric(df["%CHNG"], errors="coerce")
         df["VALUE"] = pd.to_numeric(df["VALUE"], errors="coerce")
+        df["LTP"] = pd.to_numeric(df["LTP"], errors="coerce")
+
 
         df_advance = df[df['%CHNG'] > 0] # Filter for advancing stocks
         df_decline = df[df['%CHNG'] < 0] # Filter for declining stocks

@@ -36,6 +36,7 @@ st.set_page_config(
 # Live Market Data Visualization
 # ================================
 
+
 """
 ## ⚡ Live Market Data
 """
@@ -75,189 +76,296 @@ with st.expander("", expanded=True):
             st.stop()
 
         df = df.copy()
-        df["%CHNG"] = pd.to_numeric(df["%CHNG"], errors="coerce")
-        df["VALUE"] = pd.to_numeric(df["VALUE"], errors="coerce")
-        df = df.dropna()
-        df = df[df["VALUE"] > 0]
 
-        fno_symbols = set()
-        try:
-            fno_df_symbols = pd.read_csv("symbol_data/fno.csv")
-            fno_symbols = set(fno_df_symbols["SYMBOL"].str.upper())
-        except Exception:
-            pass
+        # ✅ Only drop rows where %CHNG or VALUE specifically are null
+        # df = df.dropna(subset=[ "VALUE","%CHNG"])
+        # df = df[df["VALUE"] > 0]
+        # ── Filters row ─────────────────────────────────────────────────
+        filter_col1, filter_col2 = st.columns([3, 4])
 
-        exclude_fno = False
-        if st.session_state.selected_index == "NIFTY 500":
-            exclude_fno = st.toggle("Exclude F&O stocks from NIFTY 500", value=True)
-            if exclude_fno:
-                try:
-                    fno_df = pd.read_csv("symbol_data/fno.csv")
-                    fno_symbols = set(fno_df["SYMBOL"].str.upper())
-                    df = df[~df["SYMBOL"].str.upper().isin(fno_symbols)]
-                except Exception as e:
-                    st.warning(f"Could not filter F&O stocks: {e}")
+        with filter_col1:
+            exclude_fno = False
+            if selected_index == "NIFTY 500":
+                exclude_fno = st.toggle("Exclude F&O stocks from NIFTY 500", value=False)
 
+        with filter_col2:
+            live_price_filter = st.radio(
+                "Filter by Price",
+                options=["No Filter", "Exclude < ₹50", "Exclude < ₹100"],
+                index=0,
+                horizontal=True,
+                key="live_price_filter"
+            )
+
+        # ── Apply F&O filter ────────────────────────────────────────────
+        if exclude_fno:
+            try:
+                fno_df = pd.read_csv("symbol_data/fno.csv")
+                # ✅ Explicitly use "SYMBOL" column, fallback to first column
+                sym_col = "SYMBOL" if "SYMBOL" in fno_df.columns else fno_df.columns[0]
+                fno_symbols = set(fno_df[sym_col].str.strip().str.upper())
+                df = df[~df["SYMBOL"].str.strip().str.upper().isin(fno_symbols)]
+            except Exception as e:
+                st.warning(f"Could not filter F&O stocks: {e}")
+
+        # ── Apply price filter ──────────────────────────────────────────
+        # ✅ Detect correct price column at runtime
+        price_col = next(
+            (c for c in df.columns if c.strip().upper() == "LTP"),
+            None
+        )
+        if live_price_filter == "Exclude < ₹50":
+            if price_col:
+                df = df[df[price_col] >= 50]
+            else:
+                st.warning(f"⚠️ Price column not found. Columns available: {list(df.columns)}")
+        elif live_price_filter == "Exclude < ₹100":
+            if price_col:
+                df = df[df[price_col] >= 100]
+            else:
+                st.warning(f"⚠️ Price column not found. Columns available: {list(df.columns)}")
+
+        # ── Recompute advance/decline after ALL filters ─────────────────
+        df_advance = int((df["%CHNG"] > 0).sum())
+        df_decline = int((df["%CHNG"] < 0).sum())
+
+        if df.empty:
+            st.warning("No data available for selected filter.")
+            st.stop()
+        print("------------------------------------------------------------------")
+        print(f"number of rows in live data after df.empty {selected_index}: {len(df)}")
+        print("------------------------------------------------------------------")
         df["Color"] = df["%CHNG"].apply(lambda x: "Gain" if x > 0 else "Loss")
 
-        max_val = max(abs(df["%CHNG"].max()), abs(df["%CHNG"].min()))
-        max_val = round(max_val + 0.5)
-        ticks = np.arange(-max_val, max_val + 0.5, 0.5)
+        # ── Pre-compute shared values ───────────────────────────────────
+        adv_turnover_val = df[df['%CHNG'] > 0]['VALUE'].sum()
+        dec_turnover_val = df[df['%CHNG'] < 0]['VALUE'].sum()
 
-        df_sorted = df.sort_values("VALUE", ascending=False).copy()
-        df_sorted["SHOW_LABEL"] = False
-        df_sorted["RANK"] = np.nan
-        df_sorted["LABEL"] = ""
+        # ══════════════════════════════════════════════════════════════
+        # ROW 1 — Treemap (full width)
+        # ══════════════════════════════════════════════════════════════
+        print("------------------------------------------------------------------" )
+        print(f"No of rows for selected_index in treemap: {selected_index}: {len(df)}")
+        print("------------------------------------------------------------------")
 
-        top_n = min(20, len(df_sorted))
-        df_sorted.iloc[:top_n, df_sorted.columns.get_loc("SHOW_LABEL")] = True
-        df_sorted.iloc[:top_n, df_sorted.columns.get_loc("RANK")] = range(1, top_n + 1)
-        df_sorted["LABEL"] = df_sorted.apply(
-            lambda row: f"{int(row['RANK'])}. {row['SYMBOL']}" if row["SHOW_LABEL"] and not pd.isna(row["RANK"]) else "",
-            axis=1
-        )
-
-        bubble = (
-            alt.Chart(df_sorted)
-            .mark_circle(opacity=0.7)
-            .encode(
-                x=alt.X("SYMBOL:N", axis=None),
-                y=alt.Y("%CHNG:Q", title="% Change",
-                        scale=alt.Scale(domain=[-max_val, max_val]),
-                        axis=alt.Axis(values=ticks)),
-                size=alt.Size("VALUE:Q", scale=alt.Scale(range=[200, 4000]), legend=None),
-                color=alt.Color("Color:N",
-                    scale=alt.Scale(domain=["Gain", "Loss"], range=["green", "red"]),
-                    legend=None),
-                tooltip=["SYMBOL", "%CHNG", "VALUE"]
-            )
-            .properties(height=600)
-            .interactive()
-        )
-
-        text = (
-            alt.Chart(df_sorted[df_sorted["SHOW_LABEL"]])
-            .mark_text(align="center", baseline="middle", fontWeight="bold",
-                       fontSize=12, dy=0, color="white")
-            .encode(
-                x=alt.X("SYMBOL:N", axis=None),
-                y=alt.Y("%CHNG:Q"),
-                text=alt.Text("LABEL:N")
-            )
-        )
-        bubble_chart = bubble + text
-
-        # ── Advance/Decline ─────────────────────────────────────────────
-        total_count_live = df_advance + df_decline
-        adv_pct_live = round(df_advance / total_count_live * 100) if total_count_live else 0
-        dec_pct_live = round(df_decline / total_count_live * 100) if total_count_live else 0
-        net_diff_live = adv_pct_live - dec_pct_live
-
-        counts_df = pd.DataFrame({
-            "Status": ["Advance", "Decline", "Net Diff"],
-            "Count": [adv_pct_live, dec_pct_live, abs(net_diff_live)],
-            "Label": [
-                f"{df_advance} ({adv_pct_live}%)",
-                f"{df_decline} ({dec_pct_live}%)",
-                f"{'+' if net_diff_live >= 0 else '-'}{abs(net_diff_live)}%"
-            ],
-            "Direction": [
-                "Advance", "Decline",
-                "Net Positive" if net_diff_live >= 0 else "Net Negative"
-            ]
-        })
-        bar = (
-            alt.Chart(counts_df).mark_bar(cornerRadius=6)
-            .encode(
-                x=alt.X("Status:N", title="",
-                        sort=["Advance", "Decline", "Net Diff"],
-                        axis=alt.Axis(labelFontSize=13)),
-                y=alt.Y("Count:Q", title="% of Total Stocks",
-                        scale=alt.Scale(domain=[0, 100]),
-                        axis=alt.Axis(labelFontSize=12, titleFontSize=13)),
-                color=alt.Color("Direction:N",
-                    scale=alt.Scale(
-                        domain=["Advance", "Decline", "Net Positive", "Net Negative"],
-                        range=["#2ca02c", "#d62728", "#1f77b4", "#ff7f0e"]
-                    ), legend=None),
-                tooltip=["Status", "Label"],
-            )
-        )
-        bar_text = (
-            alt.Chart(counts_df).mark_text(dy=-10, color="white", size=13, fontWeight="bold")
-            .encode(
-                x=alt.X("Status:N", sort=["Advance", "Decline", "Net Diff"]),
-                y=alt.Y("Count:Q"),
-                text=alt.Text("Label:N")
-            )
-        )
-        adv_dec_chart = (bar + bar_text).properties(height=320, title="Advance vs Decline")
-
-        # ── Turnover Flow % ─────────────────────────────────────────────
-        adv_turnover_live = df[df['%CHNG'] > 0]['VALUE'].sum()
-        dec_turnover_live = df[df['%CHNG'] < 0]['VALUE'].sum()
-        total_turnover_live = adv_turnover_live + dec_turnover_live
-        adv_t_pct_live = round(adv_turnover_live / total_turnover_live * 100) if total_turnover_live else 0
-        dec_t_pct_live = round(dec_turnover_live / total_turnover_live * 100) if total_turnover_live else 0
-        net_t_diff_live = adv_t_pct_live - dec_t_pct_live
-
-        turnover_df = pd.DataFrame({
-            "Category": ["Advance", "Decline", "Net Diff"],
-            "Value": [adv_t_pct_live, dec_t_pct_live, abs(net_t_diff_live)],
-            "Label": [
-                f"{adv_t_pct_live}%",
-                f"{dec_t_pct_live}%",
-                f"{'+' if net_t_diff_live >= 0 else '-'}{abs(net_t_diff_live)}%"
-            ],
-            "Direction": [
-                "Advance", "Decline",
-                "Net Positive" if net_t_diff_live >= 0 else "Net Negative"
-            ]
-        })
-        turnover_bar = (
-            alt.Chart(turnover_df).mark_bar(cornerRadius=6)
-            .encode(
-                x=alt.X("Category:N", title="",
-                        sort=["Advance", "Decline", "Net Diff"],
-                        axis=alt.Axis(labelFontSize=13)),
-                y=alt.Y("Value:Q", title="% of Total Turnover",
-                        scale=alt.Scale(domain=[0, 100]),
-                        axis=alt.Axis(labelFontSize=12, titleFontSize=13)),
-                color=alt.Color("Direction:N",
-                    scale=alt.Scale(
-                        domain=["Advance", "Decline", "Net Positive", "Net Negative"],
-                        range=["#2ca02c", "#d62728", "#1f77b4", "#ff7f0e"]
-                    ), legend=None),
-                tooltip=["Category", "Label"],
-            )
-            .properties(height=280, title="Turnover Flow %")
-        )
-        turnover_text = (
-            alt.Chart(turnover_df).mark_text(dy=-10, color="white", size=13, fontWeight="bold")
-            .encode(
-                x=alt.X("Category:N", sort=["Advance", "Decline", "Net Diff"]),
-                y=alt.Y("Value:Q"),
-                text=alt.Text("Label:N")
-            )
-        )
-        turnover_chart_live = (turnover_bar + turnover_text)
-
-        st.markdown("### Market Bubble Chart (All Stocks)")
+        st.markdown("### 🗺️ Market Treemap — Size = Value, Color = % Change")
         with st.container(border=True):
-            st.altair_chart(bubble_chart, use_container_width=True)
+            import plotly.express as px
+            fig_treemap = px.treemap(
+                df,
+                path=["SYMBOL"],
+                values="VALUE",
+                color="%CHNG",
+                color_continuous_scale="RdYlGn",
+                color_continuous_midpoint=0,
+                hover_data={"%CHNG": ":.2f", "VALUE": ":,.0f", "LTP": ":,.2f"},
+                title=f"Live Treemap — {selected_index}"
+            )
+            fig_treemap.update_layout(
+                margin=dict(t=40, l=0, r=0, b=0),
+                coloraxis_colorbar=dict(title="% Chng"),
+                height=500
+            )
+            fig_treemap.update_traces(textinfo="label+value", textfont_size=13)
+            st.plotly_chart(fig_treemap, use_container_width=True)
 
-        col2, col3, col4 = st.columns([3, 3, 3])
-        with col2:
+        # ══════════════════════════════════════════════════════════════
+        # ROW 2 — Scatter + Advance/Decline + Turnover Flow
+        # ══════════════════════════════════════════════════════════════
+        scatter_col, adv_col, flow_col = st.columns([5, 3, 3])
+
+        # ── Scatter: Value vs % Change (log scale) ────────────────────
+        with scatter_col:
             with st.container(border=True):
+                df_sorted = df.sort_values("VALUE", ascending=False).copy()
+                top_n = min(20, len(df_sorted))
+                df_sorted["LABEL"] = ""
+                df_sorted.iloc[:top_n, df_sorted.columns.get_loc("LABEL")] = df_sorted["SYMBOL"].iloc[:top_n]
+
+                scatter = (
+                    alt.Chart(df_sorted)
+                    .mark_circle(opacity=0.75, stroke="white", strokeWidth=0.3)
+                    .encode(
+                        x=alt.X("%CHNG:Q", title="% Change",
+                                axis=alt.Axis(labelFontSize=12, titleFontSize=13)),
+                        y=alt.Y("VALUE:Q", title="Turnover (Cr)",
+                                scale=alt.Scale(type="log"),
+                                axis=alt.Axis(labelFontSize=12, titleFontSize=13)),
+                        color=alt.Color("Color:N",
+                            scale=alt.Scale(domain=["Gain", "Loss"], range=["#2ca02c", "#d62728"]),
+                            legend=None),
+                        size=alt.value(90),
+                        tooltip=["SYMBOL", "%CHNG", "VALUE"]
+                    )
+                    .properties(height=360, title="Value vs % Change (Log Scale)")
+                    .interactive()
+                )
+                scatter_labels = (
+                    alt.Chart(df_sorted[df_sorted["LABEL"] != ""])
+                    .mark_text(align="left", dx=6, fontSize=11, fontWeight="bold")
+                    .encode(
+                        x=alt.X("%CHNG:Q"),
+                        y=alt.Y("VALUE:Q", scale=alt.Scale(type="log")),
+                        text=alt.Text("LABEL:N"),
+                        color=alt.Color("Color:N",
+                            scale=alt.Scale(domain=["Gain", "Loss"], range=["#2ca02c", "#d62728"]),
+                            legend=None)
+                    )
+                )
+                st.altair_chart(scatter + scatter_labels, use_container_width=True)
+
+        # ── Advance / Decline bar ─────────────────────────────────────
+        with adv_col:
+            with st.container(border=True):
+                total_count_live = df_advance + df_decline
+                adv_pct_live = round(df_advance / total_count_live * 100) if total_count_live else 0
+                dec_pct_live = round(df_decline / total_count_live * 100) if total_count_live else 0
+                net_diff_live = adv_pct_live - dec_pct_live
+
+                counts_df = pd.DataFrame({
+                    "Status": ["Advance", "Decline", "Net Diff"],
+                    "Count": [adv_pct_live, dec_pct_live, abs(net_diff_live)],
+                    "Label": [
+                        f"{df_advance} ({adv_pct_live}%)",
+                        f"{df_decline} ({dec_pct_live}%)",
+                        f"{'+' if net_diff_live >= 0 else '-'}{abs(net_diff_live)}%"
+                    ],
+                    "Direction": [
+                        "Advance", "Decline",
+                        "Net Positive" if net_diff_live >= 0 else "Net Negative"
+                    ]
+                })
+                bar = (
+                    alt.Chart(counts_df).mark_bar(cornerRadius=6)
+                    .encode(
+                        x=alt.X("Status:N", title="",
+                                sort=["Advance", "Decline", "Net Diff"],
+                                axis=alt.Axis(labelFontSize=13)),
+                        y=alt.Y("Count:Q", title="% of Total Stocks",
+                                scale=alt.Scale(domain=[0, 100]),
+                                axis=alt.Axis(labelFontSize=12, titleFontSize=13)),
+                        color=alt.Color("Direction:N",
+                            scale=alt.Scale(
+                                domain=["Advance", "Decline", "Net Positive", "Net Negative"],
+                                range=["#2ca02c", "#d62728", "#1f77b4", "#ff7f0e"]
+                            ), legend=None),
+                        tooltip=["Status", "Label"],
+                    )
+                )
+                bar_text = (
+                    alt.Chart(counts_df).mark_text(dy=-10, color="white", size=13, fontWeight="bold")
+                    .encode(
+                        x=alt.X("Status:N", sort=["Advance", "Decline", "Net Diff"]),
+                        y=alt.Y("Count:Q"),
+                        text=alt.Text("Label:N")
+                    )
+                )
+                adv_dec_chart = (bar + bar_text).properties(height=320, title="Advance vs Decline")
                 st.altair_chart(adv_dec_chart, use_container_width=True)
-        with col3:
-            with st.container(border=True):
-                st.altair_chart(turnover_chart_live, use_container_width=True)
-        with col4:
-            df_display = df.sort_values("VALUE", ascending=False).reset_index(drop=True).drop(columns=["Color"])
-            st.dataframe(df_display)
 
-        # ── Range and Turnover Bucket Charts ────────────────────────────
+        # ── Turnover Flow % ───────────────────────────────────────────
+        with flow_col:
+            with st.container(border=True):
+                total_turnover_live = adv_turnover_val + dec_turnover_val
+                adv_t_pct = round(adv_turnover_val / total_turnover_live * 100) if total_turnover_live else 0
+                dec_t_pct = round(dec_turnover_val / total_turnover_live * 100) if total_turnover_live else 0
+                net_t_diff = adv_t_pct - dec_t_pct
+
+                turnover_df = pd.DataFrame({
+                    "Category": ["Advance", "Decline", "Net Diff"],
+                    "Value": [adv_t_pct, dec_t_pct, abs(net_t_diff)],
+                    "Label": [
+                        f"{adv_t_pct}%",
+                        f"{dec_t_pct}%",
+                        f"{'+' if net_t_diff >= 0 else '-'}{abs(net_t_diff)}%"
+                    ],
+                    "Direction": [
+                        "Advance", "Decline",
+                        "Net Positive" if net_t_diff >= 0 else "Net Negative"
+                    ]
+                })
+                turnover_bar = (
+                    alt.Chart(turnover_df).mark_bar(cornerRadius=6)
+                    .encode(
+                        x=alt.X("Category:N", title="",
+                                sort=["Advance", "Decline", "Net Diff"],
+                                axis=alt.Axis(labelFontSize=13)),
+                        y=alt.Y("Value:Q", title="% of Total Turnover",
+                                scale=alt.Scale(domain=[0, 100]),
+                                axis=alt.Axis(labelFontSize=12, titleFontSize=13)),
+                        color=alt.Color("Direction:N",
+                            scale=alt.Scale(
+                                domain=["Advance", "Decline", "Net Positive", "Net Negative"],
+                                range=["#2ca02c", "#d62728", "#1f77b4", "#ff7f0e"]
+                            ), legend=None),
+                        tooltip=["Category", "Label"],
+                    )
+                    .properties(height=320, title="Turnover Flow %")
+                )
+                turnover_text = (
+                    alt.Chart(turnover_df).mark_text(dy=-10, color="white", size=13, fontWeight="bold")
+                    .encode(
+                        x=alt.X("Category:N", sort=["Advance", "Decline", "Net Diff"]),
+                        y=alt.Y("Value:Q"),
+                        text=alt.Text("Label:N")
+                    )
+                )
+                st.altair_chart(turnover_bar + turnover_text, use_container_width=True)
+
+        # ══════════════════════════════════════════════════════════════
+        # ROW 3 — Bubble Chart (full width)
+        # ══════════════════════════════════════════════════════════════
+        st.markdown("### 🫧 Bubble Chart — Size = Value, Color Intensity = % Change")
+        with st.container(border=True):
+            max_val = max(abs(df["%CHNG"].max()), abs(df["%CHNG"].min()))
+            max_val = round(max_val + 0.5)
+            ticks = np.arange(-max_val, max_val + 0.5, 0.5)
+
+            df_sorted = df.sort_values("VALUE", ascending=False).copy()
+            df_sorted["SHOW_LABEL"] = False
+            df_sorted["RANK"] = np.nan
+            df_sorted["LABEL"] = ""
+
+            top_n = min(20, len(df_sorted))
+            df_sorted.iloc[:top_n, df_sorted.columns.get_loc("SHOW_LABEL")] = True
+            df_sorted.iloc[:top_n, df_sorted.columns.get_loc("RANK")] = range(1, top_n + 1)
+            df_sorted["LABEL"] = df_sorted.apply(
+                lambda row: f"{int(row['RANK'])}. {row['SYMBOL']}" if row["SHOW_LABEL"] and not pd.isna(row["RANK"]) else "",
+                axis=1
+            )
+
+            bubble = (
+                alt.Chart(df_sorted)
+                .mark_circle(opacity=0.8, stroke="white", strokeWidth=0.4)
+                .encode(
+                    x=alt.X("SYMBOL:N", axis=None),
+                    y=alt.Y("%CHNG:Q", title="% Change",
+                            scale=alt.Scale(domain=[-max_val, max_val]),
+                            axis=alt.Axis(values=ticks)),
+                    size=alt.Size("VALUE:Q", scale=alt.Scale(range=[150, 4000]), legend=None),
+                    color=alt.Color("%CHNG:Q",
+                        scale=alt.Scale(scheme="redyellowgreen", domain=[-5, 5], clamp=True),
+                        legend=alt.Legend(title="% Chng")),
+                    tooltip=["SYMBOL", "%CHNG", "VALUE"]
+                )
+                .properties(height=550)
+                .interactive()
+            )
+            bubble_labels = (
+                alt.Chart(df_sorted[df_sorted["SHOW_LABEL"]])
+                .mark_text(align="center", baseline="middle", fontWeight="bold",
+                           fontSize=11, dy=0, color="white")
+                .encode(
+                    x=alt.X("SYMBOL:N", axis=None),
+                    y=alt.Y("%CHNG:Q"),
+                    text=alt.Text("LABEL:N")
+                )
+            )
+            st.altair_chart(bubble + bubble_labels, use_container_width=True)
+
+        # ══════════════════════════════════════════════════════════════
+        # ROW 4 — Range Bucket Charts + Top 15 Table
+        # ══════════════════════════════════════════════════════════════
         bins = [-20, -10, -5, -3, -1, 0, 1, 3, 5, 10, 20]
         labels = [
             "-20% to -10%", "-10% to -5%", "-5% to -3%", "-3% to -1%", "-1% to 0%",
@@ -282,16 +390,16 @@ with st.expander("", expanded=True):
             alt.Chart(bucket_counts_live).mark_bar(cornerRadius=8)
             .encode(
                 y=alt.Y("range:N", sort=labels, title="% Change Bucket",
-                        axis=alt.Axis(labelFontSize=13, titleFontSize=15)),
+                        axis=alt.Axis(labelFontSize=13, titleFontSize=14)),
                 x=alt.X("count:Q", title="Number of Stocks",
-                        axis=alt.Axis(labelFontSize=13, titleFontSize=15)),
+                        axis=alt.Axis(labelFontSize=12, titleFontSize=13)),
                 color=alt.condition(
                     alt.FieldOneOfPredicate(field="range", oneOf=["0% to 1%", "1% to 3%", "3% to 5%", "5% to 10%", "10% to 20%"]),
                     alt.value("#2ca02c"), alt.value("#d62728"),
                 ),
                 tooltip=["range", "count", "count_pct_label", "total_value_label"],
             )
-            .properties(title="Live Stock Count by % Change Bucket", height=360, width="container")
+            .properties(title="Live Stock Count by % Change Bucket", height=360)
         )
         count_text_live = (
             alt.Chart(bucket_counts_live).mark_text(dx=5, align="left", color="white", fontWeight="bold", fontSize=13)
@@ -307,16 +415,16 @@ with st.expander("", expanded=True):
             alt.Chart(bucket_counts_live).mark_bar(cornerRadius=8)
             .encode(
                 y=alt.Y("range:N", sort=labels, title="% Change Bucket",
-                        axis=alt.Axis(labelFontSize=13, titleFontSize=15)),
+                        axis=alt.Axis(labelFontSize=13, titleFontSize=14)),
                 x=alt.X("turnover_pct:Q", title="% Share of Total Turnover",
-                        axis=alt.Axis(labelFontSize=13, titleFontSize=15)),
+                        axis=alt.Axis(labelFontSize=12, titleFontSize=13)),
                 color=alt.condition(
                     alt.FieldOneOfPredicate(field="range", oneOf=["0% to 1%", "1% to 3%", "3% to 5%", "5% to 10%", "10% to 20%"]),
                     alt.value("#1f77b4"), alt.value("#ff7f0e"),
                 ),
                 tooltip=["range", "total_value_label", "turnover_pct_label"],
             )
-            .properties(title="Live Turnover Share by % Change Bucket", height=360, width="container")
+            .properties(title="Live Turnover Share by % Change Bucket", height=360)
         )
         turnover_text_live = (
             alt.Chart(bucket_counts_live).mark_text(dx=5, align="left", color="white", fontWeight="bold", fontSize=13)
@@ -328,13 +436,48 @@ with st.expander("", expanded=True):
         )
         turnover_range_chart_live = turnover_range_chart_live + turnover_text_live
 
-        range_col1_live, r_col2_live = st.columns([10, 10])
+        range_col1_live, r_col2_live, top15_col_live = st.columns([4, 4, 3])
         with range_col1_live:
             with st.container(border=True):
                 st.altair_chart(range_chart_live, use_container_width=True)
         with r_col2_live:
             with st.container(border=True):
                 st.altair_chart(turnover_range_chart_live, use_container_width=True)
+
+        # ── Top 15 Value-Weighted Movers Table ────────────────────────
+        with top15_col_live:
+            with st.container(border=True):
+                st.markdown("#### 🏆 Top Movers by Value")
+                top_movers_live = (
+                    df.sort_values("VALUE", ascending=False)
+                    .head(15)[["SYMBOL", "VALUE", "%CHNG"]]
+                    .reset_index(drop=True)
+                )
+                top_movers_live.index += 1
+                st.dataframe(
+                    top_movers_live,
+                    use_container_width=True,
+                    height=360,
+                    column_config={
+                        "VALUE": st.column_config.ProgressColumn(
+                            "Value (Cr)",
+                            format="%.0f",
+                            min_value=0,
+                            max_value=float(top_movers_live["VALUE"].max())
+                        ),
+                        "%CHNG": st.column_config.NumberColumn(
+                            "% Change",
+                            format="%.2f%%"
+                        ),
+                    }
+                )
+
+        # ══════════════════════════════════════════════════════════════
+        # ROW 5 — Full Data Table
+        # ══════════════════════════════════════════════════════════════
+        with st.expander("📋 Full Data Table", expanded=False):
+            df_display = df.sort_values("VALUE", ascending=False).reset_index(drop=True).drop(columns=["Color"])
+            st.dataframe(df_display, use_container_width=True)
 
     except Exception as e:
         st.error(f"Error loading live market data: {e}")
@@ -429,7 +572,7 @@ with st.expander("", expanded=True):
                         color="%CHNG",
                         color_continuous_scale="RdYlGn",
                         color_continuous_midpoint=0,
-                        hover_data={"%CHNG": ":.2f", "VALUE": ":,.0f"},
+                        hover_data={"%CHNG": ":.2f", "VALUE": ":,.0f", "IEP": ":,.2f"}, 
                         title=f"Pre-open Treemap — {selected_preopen_index}"
                     )
                     fig_treemap.update_layout(
