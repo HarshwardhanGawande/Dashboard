@@ -1,14 +1,9 @@
-from operator import index
-
 import requests
 import json
 import pandas as pd
-from datetime import datetime,timedelta,date
+from datetime import datetime, timedelta, date
 from dotenv import load_dotenv
 import os
-import streamlit as st
-from urllib.parse import urlencode
-from io import StringIO
 
 load_dotenv(override=True)
 
@@ -63,179 +58,141 @@ nifty_dict = {
     "INFY": 408065,
     "TECHM": 3465729,
     "HCLTECH": 1850625,
-    "NIFTY 50": 256265
+    "NIFTY 50": 256265,
 }
-# Access them using standard os.getenv()
-USER_ID = os.getenv('USER_ID')
-PASSWORD = os.getenv('PASSWORD')
+
+# ─── Config ──────────────────────────────────────────────────────────────────
+
+USER_ID  = os.getenv('USER_ID')
+PASSWORD = os.getenv('ZERODHA_PASSWORD')
 ENCTOKEN = os.getenv('ENCTOKEN')
-KF_SESSION = os.getenv('KF_SESSION')
-PUBLIC_TOKEN = os.getenv('PUBLIC_TOKEN')
-FROM_DATE = "2026-03-25"
-TO_DATE = "2026-03-25"
-query = {
-        'user_id': USER_ID,
-        'oi': "1",
-        'from': FROM_DATE,
-        'to': TO_DATE
-            }
-headers = {'authorization': f"enctoken {ENCTOKEN}"}
 
-login_url = "https://kite.zerodha.com/api/login"
-twofa_url = "https://kite.zerodha.com/api/twofa"
-
+BASE_URL     = 'https://kite.zerodha.com'
+LOGIN_URL    = f'{BASE_URL}/api/login'
+TWOFA_URL    = f'{BASE_URL}/api/twofa'
+HIST_URL     = f'{BASE_URL}/oms/instruments/historical/{{instrument_id}}/{{interval}}'
+CHUNK_DAYS   = 1825   # 5-year max per request
 
 s = requests.Session()
 
+# ─── Auth ─────────────────────────────────────────────────────────────────────
+
+def _get_headers():
+    return {'authorization': f'enctoken {ENCTOKEN}'}
+
+
+def _save_enctoken(enctoken: str):
+    """Update only ENCTOKEN in .env, preserve all other lines."""
+    env_lines = []
+    if os.path.exists('.env'):
+        with open('.env', 'r') as f:
+            env_lines = f.readlines()
+
+    env_lines = [l for l in env_lines if not l.startswith('ENCTOKEN=')]
+    env_lines.append(f'ENCTOKEN={enctoken}\n')
+
+    with open('.env', 'w') as f:
+        f.writelines(env_lines)
+
+
+def _login():
+    """Perform login + 2FA and update ENCTOKEN globally."""
+    global ENCTOKEN
+
+    r = s.post(LOGIN_URL, data={'user_id': USER_ID, 'password': PASSWORD})
+    request_id = r.json()['data']['request_id']
+
+    twofa_value = input('Enter 2FA value: ')
+    s.post(TWOFA_URL, data={
+        'user_id': USER_ID,
+        'request_id': request_id,
+        'twofa_value': twofa_value,
+    })
+
+    ENCTOKEN = requests.utils.dict_from_cookiejar(s.cookies)['enctoken']
+    print(f'New ENCTOKEN: {ENCTOKEN}')
+    _save_enctoken(ENCTOKEN)
+
+
 def test_validity():
-    global headers, query, ENCTOKEN, KF_SESSION, PUBLIC_TOKEN
-    print("------------------------------------------------------------------")
-    print("Enctoken:", ENCTOKEN)
-    print("------------------------------------------------------------------")
-    print("KF_SESSION:", KF_SESSION)
-    print("------------------------------------------------------------------")
-    print("PUBLIC_TOKEN:", PUBLIC_TOKEN)
-    print("------------------------------------------------------------------")
+    """Check token validity; re-login if expired."""
+    print(f'Checking token: {ENCTOKEN}')
 
-    # Use a short interval for testing (30 days)
-    # test_from = (date.today() - timedelta(days=30)).strftime('%Y-%m-%d')
-    # test_query = query.copy()
-    # test_query['from'] = test_from
+    resp = s.get(
+        url=HIST_URL.format(instrument_id=86529, interval='minute'),
+        headers=_get_headers(),
+        params={'user_id': USER_ID, 'oi': '1',
+                'from': '2026-03-25', 'to': '2026-03-25'},
+    )
 
-    data = s.get(url='https://kite.zerodha.com/oms/instruments/historical/86529/minute', headers=headers, params=query)
-    status_code = data.status_code
-    print("status code from validity test:", status_code)
-    if status_code != 200:
-        status =data.json()['status']
-        error_message = data.json()['message']
-        print(f"Token validity test failed with status {status} and message: {error_message}")
-        r = s.post(login_url, data={"user_id": USER_ID, "password": PASSWORD})
-        j = json.loads(r.text)
-        request_id = j['data']["request_id"]
-        twofa_value = input('Enter 2FA value:\n')
-        param = {"user_id": USER_ID, "request_id": request_id, "twofa_value": twofa_value}
-        r = s.post(twofa_url, data=param)
-        j = json.loads(r.text)
-        my_cookies = requests.utils.dict_from_cookiejar(s.cookies)
-        public_token = my_cookies['public_token']
-        kf_session = my_cookies['kf_session']
-        enctoken = my_cookies['enctoken']
-        print("public_token:", public_token)
-        print("kf_session:", kf_session)
-        print("enctoken:", enctoken)
-
-
-        ENCTOKEN = enctoken
-        KF_SESSION = kf_session
-        PUBLIC_TOKEN = public_token
-
-        headers = {'authorization': f"enctoken {ENCTOKEN}"}
-
-        if os.path.exists('.env'):
-            with open('.env', 'r') as f:
-                env_lines = f.readlines()
-        else:
-            env_lines = []
-
-        env_lines = [line for line in env_lines if not any(token in line for token in ['ENCTOKEN=', 'KF_SESSION=', 'PUBLIC_TOKEN='])]
-        env_lines.append(f'ENCTOKEN={enctoken}\n')
-        env_lines.append(f'KF_SESSION={kf_session}\n')
-        env_lines.append(f'PUBLIC_TOKEN={public_token}\n')
-
-        with open('.env', 'w') as f:
-            f.writelines(env_lines)
+    if resp.status_code != 200:
+        print(f"Token expired: {resp.json().get('message')} — logging in...")
+        _login()
     else:
-        s.cookies.set('public_token', PUBLIC_TOKEN)
-        s.cookies.set('kf_session', KF_SESSION)
-        s.cookies.set('enctoken', ENCTOKEN)
+        print('Token valid.')
 
-TO_DATE = date.today().strftime('%Y-%m-%d')
-query['to'] = TO_DATE
+# ─── Data Fetching ────────────────────────────────────────────────────────────
 
-@st.cache_resource(show_spinner=False, ttl="6h")
-def load_data(tickers, from_date, interval='day'):
-        test_validity()
+def _fetch_chunk(tickers: list, from_str: str, to_str: str, interval: str) -> pd.DataFrame:
+    """Fetch one date-range chunk for all tickers."""
+    params = {'user_id': USER_ID, 'oi': '1', 'from': from_str, 'to': to_str}
+    chunk_df = None
 
-        # Calculate number of days requested
-        from_date_obj = datetime.strptime(from_date, '%Y-%m-%d').date()
-        to_date_obj = date.today()
-        days_requested = (to_date_obj - from_date_obj).days
+    for ticker in tickers:
+        instrument_id = nifty_dict.get(ticker)
+        if not instrument_id:
+            raise ValueError(f'Unknown ticker: {ticker}')
 
-        # If more than 5 years (1825 days), split into chunks
-        main_df = None
+        url  = HIST_URL.format(instrument_id=instrument_id, interval=interval)
+        resp = s.get(url=url, headers=_get_headers(), params=params)
+        data = resp.json()
 
-        if days_requested > 1825:
-            # Make multiple requests for 5-year chunks
-            chunk_size = 1825  # 5 years
-            current_from = from_date_obj
+        print(f'{ticker} [{instrument_id}] — {data.get("status")} ({resp.status_code})')
 
-            while current_from < to_date_obj:
-                chunk_to = min(current_from + timedelta(days=chunk_size), to_date_obj)
-                chunk_from_str = current_from.strftime('%Y-%m-%d')
-                chunk_to_str = chunk_to.strftime('%Y-%m-%d')
+        if data.get('status') != 'success':
+            raise RuntimeError(f"Error fetching {ticker}: {data.get('message', 'Unknown error')}")
 
-                print(f"Fetching chunk: {chunk_from_str} to {chunk_to_str}")
-                chunk_query = query.copy()
-                chunk_query['from'] = chunk_from_str
-                chunk_query['to'] = chunk_to_str
+        df = (
+            pd.DataFrame(data['data']['candles'])
+              .iloc[:, [0, 4]]          # keep timestamp + close only
+              .set_index(0)
+              .rename(columns={4: ticker})
+        )
 
-                chunk_df = _fetch_chunk(tickers, chunk_query, interval, headers)
+        chunk_df = df if chunk_df is None else chunk_df.join(df)
 
-                if main_df is None:
-                    main_df = chunk_df
-                else:
-                    main_df = pd.concat([main_df, chunk_df]).sort_index()
-
-                current_from = chunk_to + timedelta(days=1)
-        else:
-            # Single request for <= 5 years
-            query['from'] = from_date
-            print("To_date:", query['to'], "From_date:", query['from'])
-            main_df = _fetch_chunk(tickers, query, interval, headers)
-
-        # Ensure index is date and has correct name for melt
-        if main_df.index.name != 'Date':
-            main_df.index.name = 'Date'
-
-        return main_df
+    return chunk_df
 
 
-def _fetch_chunk(tickers, chunk_query, interval, headers):
-        """Helper function to fetch data for a single chunk"""
-        chunk_df = None
+def load_data(tickers: list, from_date: str, interval: str = 'day') -> pd.DataFrame:
+    """
+    Load historical close prices for given tickers.
+    Automatically splits into 5-year chunks if range exceeds limit.
+    """
+    test_validity()
 
-        for index, ticker in enumerate(tickers):
-            ID = nifty_dict.get(ticker)
-            print(f"Fetching data for {ticker} with ID {ID}...")
-            fetch_url = 'https://kite.zerodha.com/oms/instruments/historical/{0}/{1}'.format(ID, interval)
+    from_dt  = datetime.strptime(from_date, '%Y-%m-%d').date()
+    to_dt    = date.today()
+    to_str   = to_dt.strftime('%Y-%m-%d')
 
-            # # Print curl command for debugging
-            # curl_cmd = f"curl -H 'authorization: {headers['authorization']}' '{fetch_url}?{urlencode(chunk_query)}'"
-            # print(f"Curl command for {ticker}: {curl_cmd}")
+    days_requested = (to_dt - from_dt).days
+    main_df = None
 
-            response = s.get(url=fetch_url, headers=headers, params=chunk_query)
-            data = response.json()
-            print(f"Status Message for {ticker}:", data.get('status'), " status code: ", response.status_code)
+    if days_requested > CHUNK_DAYS:
+        current_from = from_dt
+        while current_from < to_dt:
+            chunk_to  = min(current_from + timedelta(days=CHUNK_DAYS), to_dt)
+            print(f'Fetching chunk: {current_from} → {chunk_to}')
+            chunk_df  = _fetch_chunk(tickers, current_from.strftime('%Y-%m-%d'),
+                                     chunk_to.strftime('%Y-%m-%d'), interval)
+            main_df   = chunk_df if main_df is None else pd.concat([main_df, chunk_df]).sort_index()
+            current_from = chunk_to + timedelta(days=1)
+    else:
+        print(f'Fetching: {from_date} → {to_str}')
+        main_df = _fetch_chunk(tickers, from_date, to_str, interval)
 
-            if data.get('status') != 'success':
-                raise RuntimeError(f"Error fetching data for {ticker}: {data.get('message', 'Unknown error')}")
-
-            y = data['data']['candles']
-            df = pd.DataFrame(y)
-
-            if index == 0:
-                chunk_df = df
-                chunk_df.drop(columns=[1, 2, 3, 5, 6], inplace=True)
-                chunk_df.set_index(0, inplace=True)
-                chunk_df.rename(columns={4: ticker}, inplace=True)
-            else:
-                df.drop(columns=[1, 2, 3, 5, 6], inplace=True)
-                df.set_index(0, inplace=True)
-                df.rename(columns={4: ticker}, inplace=True)
-                chunk_df = chunk_df.join(df)
-
-        return chunk_df
-
+    main_df.index.name = 'Date'
+    return main_df
 
 @st.cache_data(show_spinner=False, ttl=300)
 def get_pre_open_data_cached(index):
