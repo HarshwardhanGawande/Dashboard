@@ -165,7 +165,7 @@ def _fetch_chunk(tickers: list, from_str: str, to_str: str, interval: str) -> pd
             raise ValueError(f'Unknown ticker: {ticker}')
 
         url  = HIST_URL.format(instrument_id=instrument_id, interval=interval)
-        resp = s.get(url=url, headers=_get_headers(), params=params)
+        resp = s.get(url=url, headers=_get_headers(), params=params, verify=True)
         data = resp.json()
 
         print(f'{ticker} [{instrument_id}] — {data.get("status")} ({resp.status_code})')
@@ -238,7 +238,7 @@ def get_pre_open_data_cached(index):
     session.get("https://www.nseindia.com", headers=headers)
 
     try:
-        response = session.get(url, headers=headers)
+        response = session.get(url, headers=headers, verify=True)
         response.raise_for_status()
 
         df = pd.read_csv(StringIO(response.text[160:]), header=None, sep=',', quotechar='"', on_bad_lines='skip')
@@ -298,7 +298,7 @@ def get_live_nse_data(index):
     session.get("https://www.nseindia.com", headers=headers)  # Set cookies
 
     try:
-        response = session.get(url, headers=headers)
+        response = session.get(url, headers=headers,verify=True)
         response.raise_for_status()
         print(f"Response status: {response.status_code}")
         print(f"Response content type: {response.headers.get('content-type')}")
