@@ -235,7 +235,7 @@ def get_pre_open_data_cached(index):
         'Accept-Language': 'en-US,en;q=0.9',
     }
     session = requests.Session()
-    session.get("https://www.nseindia.com", headers=headers)
+    session.get("https://www.nseindia.com", headers=headers,verify=True)
 
     try:
         response = session.get(url, headers=headers, verify=True)
@@ -295,7 +295,7 @@ def get_live_nse_data(index):
     }
     # NSE requires establishing a session first
     session = requests.Session()
-    session.get("https://www.nseindia.com", headers=headers)  # Set cookies
+    session.get("https://www.nseindia.com", headers=headers,verify=True)  # Set cookies
 
     try:
         response = session.get(url, headers=headers,verify=True)
