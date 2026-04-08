@@ -42,7 +42,7 @@ st.set_page_config(
 """
 
 @st.cache_data(show_spinner=False, ttl=300)
-def cached_get_live_nse_data(selected_index):
+def cached_get_live_nse_data(selected_index, refresh_key=0):
     from zerodha_data import get_live_nse_data
     return get_live_nse_data(selected_index)
 
@@ -51,6 +51,8 @@ with st.expander("", expanded=True):
 
     if "selected_index" not in st.session_state:
         st.session_state.selected_index = "NIFTY 50"
+    if "live_data_refresh_key" not in st.session_state:
+        st.session_state.live_data_refresh_key = 0
 
     index_options = ["NIFTY 500", "SECURITIES IN F&O", "NIFTY 50", "NIFTY BANK",
                     "NIFTY IT", "NIFTY AUTO", "NIFTY ENERGY", "NIFTY OIL & GAS"]
@@ -67,8 +69,14 @@ with st.expander("", expanded=True):
     elif selected_index != st.session_state.selected_index:
         st.session_state.selected_index = selected_index
 
+    refresh_col1, refresh_col2 = st.columns([6, 1])
+    with refresh_col2:
+        if st.button("🔄 Refresh", key="refresh_live_data", use_container_width=True, help="Fetch the latest live data now"):
+            st.session_state.live_data_refresh_key += 1
+            cached_get_live_nse_data.clear()
+
     try:
-        result = cached_get_live_nse_data(selected_index)
+        result = cached_get_live_nse_data(selected_index, st.session_state.live_data_refresh_key)
         if isinstance(result, tuple) and len(result) == 5:
             df, df_advance, df_decline, percent_advance_turnover_live, percent_decline_turnover_live = result
         else:
@@ -572,7 +580,7 @@ with st.expander("", expanded=True):
                         color="%CHNG",
                         color_continuous_scale="RdYlGn",
                         color_continuous_midpoint=0,
-                        hover_data={"%CHNG": ":.2f", "VALUE": ":,.0f", "IEP": ":,.2f"}, 
+                        hover_data={"%CHNG": ":.2f", "VALUE": ":,.0f", "IEP": ":,.2f"},
                         title=f"Pre-open Treemap — {selected_preopen_index}"
                     )
                     fig_treemap.update_layout(
