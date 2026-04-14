@@ -859,49 +859,74 @@ with col_vbtn:
 
 if st.session_state.show_volume and st.session_state.volume_data and st.session_state.volume_ticker == ticker:
     vd = st.session_state.volume_data
+    import plotly.express as px
+    import pandas as pd
+
+    today_label = vd["today_label"] if vd.get("is_holiday") else "Today"
+    labels = ["1M Avg", "2W Avg", "1W Avg", "Prev Day", today_label]
+    values = [vd["avg_1m"], vd["avg_2w"], vd["avg_1w"], vd["prev_day"], vd["today"]]
+    colors = ["#f76a8a", "#f7a26a", "#7c6af7", "#00b8ff", "#00e5a0"]
 
     def fmt_vol(v):
         if v >= 1_000_000: return f"{v/1_000_000:.2f}M"
         if v >= 1_000:     return f"{v/1_000:.1f}K"
         return str(v)
 
-    today_label = vd["today_label"] if vd.get("is_holiday") else "Today"
-    labels = [today_label, "Prev Day", "1W Avg", "2W Avg", "1M Avg"]
-    values = [vd["today"], vd["prev_day"], vd["avg_1w"], vd["avg_2w"], vd["avg_1m"]]
-    colors = ["#00e5a0", "#00b8ff", "#7c6af7", "#f7a26a", "#f76a8a"]
+    df = pd.DataFrame({
+        "Period": labels[::-1],   # reverse so Today appears at top
+        "Volume": values[::-1],
+        "Color":  colors[::-1],
+        "Label":  [fmt_vol(v) for v in values[::-1]],
+    })
 
-    max_val = max(values) if max(values) > 0 else 1
-
-    bars_html = ""
-    for i, (label, val, color) in enumerate(zip(labels, values, colors)):
-        pct      = (val / max_val) * 100
-        is_today = label == today_label
-        border   = f"box-shadow:0 0 8px {color};" if is_today else ""
-        vs1m     = f"{((val/vd['avg_1m']-1)*100):+.0f}% vs 1M" if vd['avg_1m'] > 0 and is_today and val > 0 else ""
-        bars_html += (
-            f'<div style="display:flex;align-items:center;margin-bottom:0.6rem;gap:0.75rem;">'
-            f'<div style="width:90px;font-size:0.7rem;color:#8890a0;text-align:right;flex-shrink:0;white-space:nowrap;">{label}</div>'
-            f'<div style="flex:1;background:#1e2128;border-radius:6px;height:32px;position:relative;">'
-            f'<div style="width:{pct}%;height:100%;border-radius:6px;background:{color};{border}display:flex;align-items:center;justify-content:flex-end;padding-right:8px;box-sizing:border-box;min-width:60px;">'
-            f'<span style="font-size:0.78rem;font-weight:700;color:#000;">{fmt_vol(val)}</span>'
-            f'</div></div>'
-            f'<div style="width:60px;font-size:0.7rem;color:#4a5060;flex-shrink:0;">{vs1m}</div>'
-            f'</div>'
-        )
-
-    holiday_notice = ""
-    if vd.get("is_holiday"):
-        holiday_notice = f'<div style="font-size:0.75rem; color:#f7a26a; margin-bottom:0.75rem;">⚠️ Market closed today — showing last trading day ({vd["today_label"]})</div>'
-
-    full_html = (
-        '<div style="background:#111318; border:1px solid #1e2128; border-radius:10px; padding:1.25rem; margin-bottom:1rem;">'
-        '<div style="font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:0.1em; color:#4a5060; margin-bottom:0.5rem;">📊 VOLUME ANALYSIS — ' + ticker + '</div>'
-        + holiday_notice +
-        '<div style="margin-top:0.75rem;">'
-        + bars_html +
-        '</div></div>'
+    fig = px.bar(
+        df,
+        x="Volume",
+        y="Period",
+        color="Period",
+        color_discrete_sequence=colors[::-1],
+        text="Label",
+        orientation="h",
+        category_orders={"Period": labels[::-1]},
     )
-    st.markdown(full_html, unsafe_allow_html=True)
+
+    fig.update_traces(
+        textposition="outside",
+        textfont=dict(color="white", size=12, family="Inter"),
+        hovertemplate="<b>%{y}</b><br>Volume: %{text}<extra></extra>",
+        marker_line_width=0,
+        width=0.5,
+    )
+
+    fig.update_layout(
+        title=dict(
+            text=f"Volume Analysis — {ticker}" + ("  ⚠️ Market closed, showing last trading day" if vd.get("is_holiday") else ""),
+            font=dict(color="#8890a0", size=13, family="Inter"),
+            x=0,
+        ),
+        paper_bgcolor="#111318",
+        plot_bgcolor="#111318",
+        font=dict(color="#8890a0", family="Inter"),
+        xaxis=dict(
+            title=None,
+            tickfont=dict(color="#4a5060", size=10),
+            gridcolor="#1e2128",
+            zeroline=False,
+        ),
+        yaxis=dict(
+            title=None,
+            tickfont=dict(color="#c0c8d8", size=12),
+            gridcolor="#1e2128",
+            zeroline=False,
+            type="category",  # keeps labels categorical
+        ),
+        showlegend=False,
+        margin=dict(t=50, b=10, l=10, r=60),  # extra right margin for outside labels
+        height=260,
+        bargap=0.35,
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
 # Row 4: Order Type Buttons
 st.markdown("<div class='section-title'>ORDER TYPE</div>", unsafe_allow_html=True)
 
