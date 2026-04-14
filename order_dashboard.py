@@ -927,33 +927,26 @@ if st.session_state.show_volume and st.session_state.volume_data and st.session_
     )
 
     st.plotly_chart(fig, use_container_width=True)
-# Row 4: Order Type Buttons
+# Row 4: Order Type
 st.markdown("<div class='section-title'>ORDER TYPE</div>", unsafe_allow_html=True)
 
-order_col1, order_col2, order_col3, order_col4 = st.columns(4)
+order_options = {
+    "📊 MARKET": "MARKET",
+    "💰 LIMIT": "LIMIT",
+    "🛡️ COVER MARKET": "COVER_MARKET",
+    "⚡ COVER LIMIT": "COVER_LIMIT",
+}
 
-with order_col1:
-    if st.button("📊 MARKET", use_container_width=True, key="btn_market"):
-        st.session_state.selected_order = "MARKET"
-        st.rerun()
+selected_label = st.segmented_control(
+    "Order Type",
+    options=list(order_options.keys()),
+    default=next(k for k, v in order_options.items() if v == st.session_state.selected_order),
+    label_visibility="collapsed",
+    key="order_type_segment",
+)
 
-with order_col2:
-    if st.button("💰 LIMIT", use_container_width=True, key="btn_limit"):
-        st.session_state.selected_order = "LIMIT"
-        st.rerun()
-
-with order_col3:
-    if st.button("🛡️ COVER MARKET", use_container_width=True, key="btn_cover_market"):
-        st.session_state.selected_order = "COVER_MARKET"
-        st.rerun()
-
-with order_col4:
-    if st.button("⚡ COVER LIMIT", use_container_width=True, key="btn_cover_limit"):
-        st.session_state.selected_order = "COVER_LIMIT"
-        st.rerun()
-
-# Highlight active button
-st.markdown(f"<div style='text-align: center; margin-top: 0.5rem;'><small>Active: <b>{st.session_state.selected_order}</b></small></div>", unsafe_allow_html=True)
+if selected_label:
+    st.session_state.selected_order = order_options[selected_label]
 
 # Row 5: Order-specific inputs
 limit_price = None
